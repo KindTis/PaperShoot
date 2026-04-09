@@ -176,10 +176,15 @@ git commit -m "chore: bootstrap PaperShoot MVP shell"
 
 ```ts
 expect(createLaunchVector({ yawDeg: 0, pitchDeg: 30, power: 0.5, minPower: 0, maxPower: 1 })).toMatchObject({ x: 0, y: 6.25, z: 10.83 });
-expect(applyWindZone({ bodyPosition: { x: 0, y: 1.4, z: 3.4 }, fan }).gravityScale).toBeCloseTo(0.88, 2);
-expect(applyWindZone({ bodyPosition: { x: 1.29, y: 1.4, z: 3.4 }, fan }).windTargetX).toBeLessThan(0);
-expect(applyWindZone({ bodyPosition: { x: 1.6, y: 1.4, z: 3.4 }, fan }).windTargetX).toBe(0);
-expect(applyWindZone({ bodyPosition: { x: 0, y: 1.4, z: 6.8 }, fan }).gravityScale).toBe(1);
+const forwardFan = { ...fan, directionDeg: 0 };
+const rightFan = { ...fan, directionDeg: 90 };
+expect(applyWindZone({ bodyPosition: { x: 0, y: 1.4, z: 3.4 }, fan: forwardFan }).gravityScale).toBeCloseTo(0.88, 2);
+expect(applyWindZone({ bodyPosition: { x: 0, y: 1.4, z: 3.4 }, fan: forwardFan }).windTargetX).toBeLessThan(0);
+expect(applyWindZone({ bodyPosition: { x: 3.4, y: 1.4, z: 0 }, fan: rightFan }).windTargetX).toBeLessThan(0);
+expect(applyWindZone({ bodyPosition: { x: 0, y: 1.4, z: 3.4 }, fan: rightFan }).windTargetX).toBe(0);
+expect(applyWindZone({ bodyPosition: { x: 1.29, y: 1.4, z: 3.4 }, fan: forwardFan }).windTargetX).toBeLessThan(0);
+expect(applyWindZone({ bodyPosition: { x: 1.6, y: 1.4, z: 3.4 }, fan: forwardFan }).windTargetX).toBe(0);
+expect(applyWindZone({ bodyPosition: { x: 0, y: 1.4, z: 6.8 }, fan: forwardFan }).gravityScale).toBe(1);
 expect(advanceThrowStep(input).velocity.y).toBeGreaterThanOrEqual(-18);
 ```
 
@@ -272,9 +277,18 @@ Expected: `FAIL with missing controller / presenter modules`
 
 ```ts
 export class ThrowInputController {
+  updateAimFromNormalizedPoint(point: { x: number; y: number }): void { /* normalized 입력을 yaw/pitch로 변환 */ }
+  tick(deltaMs: number): void { /* power phase에서 ping-pong 게이지 갱신 */ }
   confirmAim(): void { if (this.phase === 'aim') this.phase = 'power'; }
   confirmPower(): void { if (this.phase === 'power') this.phase = 'flying'; }
   resetForRetry(): void { this.phase = 'aim'; this.power = this.config.startPower; }
+  getSnapshot(): ThrowInputSnapshot { /* phase, yawDeg, pitchDeg, power 반환 */ }
+  bindPointerHandlers(input: Phaser.Input.InputPlugin): void { /* mouse + keyboard 연결 */ }
+  bindTouchButtons(buttons: {
+    confirmAimButton: HTMLButtonElement;
+    confirmPowerButton: HTMLButtonElement;
+    retryButton: HTMLButtonElement;
+  }): void { /* touch 전용 액션 버튼 연결 */ }
 }
 ```
 
@@ -296,6 +310,11 @@ export function createHudRoot(doc: Document) {
       <span data-role="power"></span>
       <span data-role="failure"></span>
     </div>
+    <div class="hud-actions">
+      <button data-role="confirm-aim">확정</button>
+      <button data-role="confirm-power">던지기</button>
+      <button data-role="retry">재시도</button>
+    </div>
     <div class="hud-result" data-role="result"></div>
   `;
   doc.body.appendChild(root);
@@ -308,6 +327,9 @@ export function createHudRoot(doc: Document) {
     aimValue: root.querySelector('[data-role="aim"]')!,
     powerValue: root.querySelector('[data-role="power"]')!,
     failureReason: root.querySelector('[data-role="failure"]')!,
+    confirmAimButton: root.querySelector('[data-role="confirm-aim"]')!,
+    confirmPowerButton: root.querySelector('[data-role="confirm-power"]')!,
+    retryButton: root.querySelector('[data-role="retry"]')!,
     resultBanner: root.querySelector('[data-role="result"]')!,
   };
 }
@@ -353,6 +375,7 @@ git commit -m "feat: add throw input controller and DOM HUD shell"
 
 모든 플랫폼은 동일한 `confirmAim -> confirmPower` 상태 머신을 공유한다.
 터치는 `손을 떼면 확정`을 쓰지 않는다. 의도치 않은 확정을 막기 위해 명시적 버튼으로만 확정한다.
+`createHudRoot()`는 touch 액션 버튼을 항상 만들고, `ThrowInputController.bindTouchButtons()`가 이 버튼들을 상태 머신에 연결한다.
 
 ### Task 4: StageRepository와 Stage 1~3 데이터 구현
 
@@ -436,8 +459,11 @@ git commit -m "feat: add stage repository and tutorial stage data"
 - [ ] **Step 1: 이동 장애물 충돌, InsideBin, 실패 원인 우선순위 테스트를 작성한다**
 
 ```ts
+expect(updateBinState(tooSlowInput).state).toBe('RimContact');
+expect(updateBinState(tooFastInput).state).toBe('RimContact');
+expect(updateBinState(outsideOpeningInput).state).toBe('RimContact');
 expect(updateBinState(validEntryInput).state).toBe('EntryCandidate');
-expect(updateBinState(rimRejectInput).state).toBe('RimContact');
+expect(updateBinState(assistButOutsideOpeningInput).state).not.toBe('EntryCandidate');
 expect(updateBinState(insideDepthInput).state).toBe('SuccessLatched');
 expect(updateBinState(insideFloorInput).suppressWorldFloorFailure).toBe(true);
 expect(resolveObstacleCollision(input).z).toBeLessThan(0);
@@ -469,6 +495,13 @@ if (crossedOpeningPlaneDownward && horizontalOffset <= openingWidth / 2 && speed
   return { state: 'EntryCandidate', suppressWorldFloorFailure: false };
 }
 
+if (speed < entrySpeedMin || speed > entrySpeedMax || horizontalOffset > openingWidth / 2) {
+  return { state: 'RimContact', suppressWorldFloorFailure: false };
+}
+
+const allowAssist = currentState === 'RimContact' || currentState === 'EntryCandidate';
+const inwardAssist = allowAssist ? clamp(entryAssistRadius, 0, rimThickness) : 0;
+
 if (enteredInnerVolume && (insideTimeMs >= settleTimeMs || depthBelowOpening >= depthTolerance)) {
   return { state: 'SuccessLatched', suppressWorldFloorFailure: true };
 }
@@ -483,6 +516,7 @@ Task 5는 반드시 아래 4경로를 각각 독립 테스트로 고정한다.
 2. 유효 속도로 입구 평면을 통과해 진입 후보
 3. 내부 정착 시간 또는 깊이 조건으로 성공 래치
 4. `InsideBin` 이후 월드 바닥 실패 억제 + `bin` 로컬 바닥 처리
+5. `entryAssistRadius`는 입구 폭을 넓히지 않고, 이미 진입 후보가 된 샷에만 미세 보정으로 작동
 
 - [ ] **Step 4: 충돌/판정 테스트를 통과시킨다**
 
@@ -523,21 +557,25 @@ expect(runtime.getSnapshot().activeBody).toBeNull();
 ```
 
 ```ts
-const runtime = new StageRuntime(stageCatalog[0]);
-runtime.confirmAim();
-expect(runtime.getSnapshot().activeBody).toBeNull();
-runtime.confirmPower();
-expect(runtime.getSnapshot().activeBody?.position).toEqual(stageCatalog[0].paper.spawn);
+const successRuntime = new StageRuntime(stageCatalog[0]);
+successRuntime.confirmAim();
+expect(successRuntime.getSnapshot().activeBody).toBeNull();
+successRuntime.confirmPower();
+expect(successRuntime.getSnapshot().activeBody?.position).toEqual(stageCatalog[0].paper.spawn);
+successRuntime.applyThrowResolution({ success: true, failureReason: null });
+expect(successRuntime.getSnapshot().successCount).toBe(1);
+expect(successRuntime.getSnapshot().stageStatus).toBe('cleared');
+```
 
-runtime.applyThrowResolution({ success: true, failureReason: null });
-expect(runtime.getSnapshot().successCount).toBe(1);
-expect(runtime.getSnapshot().stageStatus).toBe('cleared');
-
-runtime.applyThrowResolution({ success: false, failureReason: 'ground_hit' });
-expect(runtime.getSnapshot().remainingThrows).toBeGreaterThanOrEqual(0);
-expect(runtime.getSnapshot().resultOverlay.kind).toBe('failure');
-runtime.tick(320);
-expect(runtime.getSnapshot().resultOverlay.kind).toBe(null);
+```ts
+const failureRuntime = new StageRuntime(stageCatalog[0]);
+failureRuntime.confirmAim();
+failureRuntime.confirmPower();
+failureRuntime.applyThrowResolution({ success: false, failureReason: 'ground_hit' });
+expect(failureRuntime.getSnapshot().remainingThrows).toBeGreaterThanOrEqual(0);
+expect(failureRuntime.getSnapshot().resultOverlay.kind).toBe('failure');
+failureRuntime.tick(320);
+expect(failureRuntime.getSnapshot().resultOverlay.kind).toBe(null);
 ```
 
 - [ ] **Step 2: 테스트가 실패하는지 확인한다**
@@ -569,7 +607,19 @@ export class StageRuntime {
   confirmPower(): void { /* input snapshot으로 launch vector 계산 후 paper.spawn에서 body 생성 */ }
   applyThrowResolution(result: { success: boolean; failureReason: FailureReason }): void { /* successCount, remainingThrows, overlay, stageStatus 갱신 */ }
   retryThrow(): void { this.activeBody = null; this.failureReason = null; this.input.resetForRetry(); }
-  getSnapshot(): RuntimeSnapshot { return { worldTimeMs: this.worldTimeMs, throwIndex: this.throwIndex, successCount: this.successCount, failureReason: this.failureReason, input: this.input.getSnapshot(), activeBody: this.activeBody }; }
+  getSnapshot(): RuntimeSnapshot {
+    return {
+      worldTimeMs: this.worldTimeMs,
+      throwIndex: this.throwIndex,
+      remainingThrows: this.remainingThrows,
+      successCount: this.successCount,
+      stageStatus: this.stageStatus,
+      resultOverlay: this.resultOverlay,
+      failureReason: this.failureReason,
+      input: this.input.getSnapshot(),
+      activeBody: this.activeBody,
+    };
+  }
 }
 ```
 
@@ -694,6 +744,8 @@ expect(stageCatalog.every((stage) => stage.score.mode === 'binary_success')).toB
 - Stage 3에서 장애물 실패 이유가 `장애물`로 보이는가
 - Stage 5에서 retry 후에도 이동 장애물 위상이 유지되는가
 - Stage 6에서 좁은 입구 통과 후 `InsideBin` 성공이 자연스럽게 보이는가
+- 쓰레기통 시각 입구 폭이 실제 충돌 폭의 `1.08x`로 보이는가
+- 종이 스프라이트와 `paper.radius` 프록시 중심이 눈에 띄게 어긋나지 않는가
 ```
 
 - [ ] **Step 2: 전체 테스트 스위트를 실행한다**
