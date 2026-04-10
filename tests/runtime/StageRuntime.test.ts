@@ -128,6 +128,17 @@ describe('StageRuntime', () => {
     expect(runtime.getSnapshot().resultOverlay.kind).toBe(null);
   });
 
+  it('keeps a stage 1 throw airborne briefly at around 80 percent power', () => {
+    const runtime = new StageRuntime(stageCatalog[0]);
+
+    runtime.confirmAim();
+    runtime.tick(170);
+    runtime.confirmPower();
+    tickRuntime(runtime, 30);
+
+    expect(runtime.getSnapshot().failureReason).not.toBe('ground_hit');
+  });
+
   it('latches a success when the throw enters the bin volume', () => {
     const successStage = {
       ...stageCatalog[0],

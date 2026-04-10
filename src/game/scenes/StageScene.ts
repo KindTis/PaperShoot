@@ -5,6 +5,7 @@ import { StageRenderer } from '../render/StageRenderer';
 import { StageRuntime } from '../runtime/StageRuntime';
 import type { RuntimeSnapshot } from '../runtime/runtimeTypes';
 import { stageCatalog } from '../stages/stageCatalog';
+import { shouldConfirmFromPointerDown } from './stageInputPolicy';
 
 const FIXED_DT_MS = 1000 / 60;
 
@@ -70,7 +71,12 @@ export class StageScene extends Phaser.Scene {
       },
       onLeftClick: (listener) => {
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-          if (pointer.button > 0) {
+          if (
+            !shouldConfirmFromPointerDown({
+              button: pointer.button,
+              event: pointer.event,
+            })
+          ) {
             return;
           }
           listener();

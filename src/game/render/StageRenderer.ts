@@ -29,7 +29,7 @@ export class StageRenderer {
     const graphics = this.graphics;
     const width = this.scene.scale.width;
     const height = this.scene.scale.height;
-    const floorY = height * 0.84;
+    const floorY = height * 0.82;
 
     this.scene.cameras.main.setBackgroundColor('#ede4d6');
     graphics.clear();
@@ -79,9 +79,19 @@ export class StageRenderer {
 
   private drawBin(): void {
     const binCenter = this.toScreen(this.stage.bin.position);
-    const collisionWidth = Math.max(42, this.stage.bin.openingWidth * 220 * binCenter.scale);
+    const collisionWidth = Math.max(68, this.stage.bin.openingWidth * 260 * binCenter.scale);
     const visualWidth = collisionWidth * 1.08;
-    const binHeight = Math.max(28, this.stage.bin.openingHeight * 180 * binCenter.scale);
+    const binHeight = Math.max(46, this.stage.bin.openingHeight * 220 * binCenter.scale);
+    const bucketHeight = binHeight * 1.2;
+
+    this.graphics.fillStyle(0x6a4f38, 0.22);
+    this.graphics.fillRoundedRect(
+      binCenter.x - visualWidth * 0.52,
+      binCenter.y - binHeight * 0.15,
+      visualWidth * 1.04,
+      bucketHeight,
+      12,
+    );
 
     this.graphics.lineStyle(4, 0x4b4b4b, 1);
     this.graphics.strokeRoundedRect(
@@ -160,7 +170,7 @@ export class StageRenderer {
     const activeBody = snapshot.activeBody;
     const position = activeBody?.position ?? this.stage.paper.spawn;
     const projected = this.toScreen(position);
-    const radius = Math.max(10, this.stage.paper.radius * 120 * projected.scale * 1.08);
+    const radius = Math.max(12, this.stage.paper.radius * 150 * projected.scale * 1.08);
 
     this.graphics.fillStyle(activeBody ? 0xfaf8f2 : 0xfaf8f2, activeBody ? 1 : 0.45);
     this.graphics.fillCircle(projected.x, projected.y, radius);
@@ -172,7 +182,7 @@ export class StageRenderer {
     const projected = projectWorldToScreen(position);
     return {
       x: this.scene.scale.width * 0.5 + projected.x,
-      y: this.scene.scale.height * 0.88 + projected.y,
+      y: this.scene.scale.height * 0.8 + projected.y,
       scale: projected.scale,
     };
   }
