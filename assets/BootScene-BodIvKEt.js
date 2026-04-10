@@ -1,0 +1,1 @@
+import{n as e}from"./chunk-B3K2TuZy.js";import{t}from"./phaser-BfyLXBn7.js";var n=e(t(),1),r=class extends n.default.Scene{constructor(){super(`BootScene`)}create(){this.scene.start(`StageScene`)}};export{r as BootScene};
