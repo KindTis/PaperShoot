@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" role="img" aria-label="Pencil cup placeholder">
+  <rect width="140" height="140" fill="#f5f8fc" />
+  <path d="M42 50h56l-6 60c-.7 8-7.3 14-15.3 14H63.3c-8 0-14.6-6-15.3-14L42 50z" fill="#cfd9e7" stroke="#566377" stroke-width="4" />
+  <path d="M52 50V30l8-8 8 8v20z" fill="#f6ce79" stroke="#6f4f2d" stroke-width="3" />
+  <path d="M70 50V24l8-8 8 8v26z" fill="#8ec5ff" stroke="#315f8a" stroke-width="3" />
+  <path d="M88 50V34l8-8 8 8v16z" fill="#ef9fc0" stroke="#7f3f5e" stroke-width="3" />
+</svg>

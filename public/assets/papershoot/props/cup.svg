@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Cup placeholder">
+  <rect width="120" height="120" fill="#f5f7fb" />
+  <path d="M33 34h54l-5 54c-.6 7-6.5 12-13.5 12H51.5c-7 0-12.9-5-13.5-12L33 34z" fill="#c5d3e7" stroke="#5b6c82" stroke-width="4" />
+  <path d="M87 44h7c8 0 14 6 14 14s-6 14-14 14h-5" fill="none" stroke="#5b6c82" stroke-width="4" stroke-linecap="round" />
+  <path d="M43 52h35" stroke="#8ea2be" stroke-width="4" stroke-linecap="round" />
+</svg>
