@@ -30,3 +30,85 @@ body {
   inset: 0;
   pointer-events: none;
 }
+
+.hud-top,
+.hud-side,
+.hud-bottom,
+.hud-result {
+  position: absolute;
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(12, 16, 24, 0.72);
+  color: #f8f8f8;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.hud-top {
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  justify-content: space-between;
+  max-height: 72px;
+}
+
+.hud-side {
+  top: 96px;
+  right: 12px;
+  justify-content: flex-end;
+}
+
+.hud-bottom {
+  left: 12px;
+  bottom: 12px;
+  max-width: 60%;
+  flex-wrap: wrap;
+}
+
+.hud-actions {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.hud-actions button {
+  min-width: 96px;
+  min-height: 48px;
+  border: 0;
+  border-radius: 10px;
+  background: #f0f0f0;
+  color: #161616;
+  font-weight: 600;
+}
+
+.hud-result {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 140px;
+  justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .hud-top {
+    max-height: 96px;
+  }
+
+  .hud-side {
+    top: 72px;
+    left: 12px;
+    right: 12px;
+    justify-content: flex-start;
+  }
+
+  .hud-bottom {
+    max-width: 68%;
+    bottom: 16px;
+  }
+}
