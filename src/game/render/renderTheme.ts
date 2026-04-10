@@ -11,6 +11,7 @@ export interface ScreenAnchor {
 export const deskCameraRigTheme = {
   originXRatio: 0.5,
   originYRatio: 0.88,
+  nearClipZ: -0.2,
   depthBias: 1.2,
   perspectiveX: 260,
   perspectiveY: 180,

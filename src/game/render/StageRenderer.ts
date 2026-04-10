@@ -2,7 +2,9 @@ import Phaser from 'phaser';
 import type { StageConfig, Vec3 } from '../contracts';
 import { getObstacleWorldPose } from '../obstacles/getObstacleWorldPose';
 import type { RuntimeSnapshot } from '../runtime/runtimeTypes';
-import { projectWorldToScreen } from './projectWorldToScreen';
+import { projectDeskPoint } from './cameraRig';
+import { createDeskLayout } from './deskLayout';
+import type { RenderViewport } from './renderTheme';
 
 type ScreenPoint = {
   x: number;
@@ -57,12 +59,23 @@ export class StageRenderer {
       return;
     }
 
-    const fanOrigin = this.toScreen(this.stage.fan.position);
-    const fanEnd = this.toScreen({
+    const layout = this.getLayout();
+    const fanOriginProjected = this.toScreen(this.stage.fan.position);
+    const fanEndProjected = this.toScreen({
       x: this.stage.fan.position.x,
       y: this.stage.fan.position.y,
       z: this.stage.fan.position.z + this.stage.fan.influenceLength,
     });
+    const fanOrigin = {
+      x: layout.fanAnchor.x,
+      y: layout.fanAnchor.y,
+      scale: fanOriginProjected.scale,
+    };
+    const fanEnd = {
+      x: fanOrigin.x + (fanEndProjected.x - fanOriginProjected.x),
+      y: fanOrigin.y + (fanEndProjected.y - fanOriginProjected.y),
+      scale: fanEndProjected.scale,
+    };
     const zoneWidth = Math.max(36, this.stage.fan.influenceWidth * 90 * fanOrigin.scale);
 
     this.graphics.fillStyle(0x77bde6, 0.18);
@@ -78,10 +91,12 @@ export class StageRenderer {
   }
 
   private drawBin(): void {
-    const binCenter = this.toScreen(this.stage.bin.position);
-    const collisionWidth = Math.max(68, this.stage.bin.openingWidth * 260 * binCenter.scale);
+    const layout = this.getLayout();
+    const projected = this.toScreen(this.stage.bin.position);
+    const binCenter = { x: layout.binAnchor.x, y: layout.binAnchor.y, scale: projected.scale };
+    const collisionWidth = Math.max(68, this.stage.bin.openingWidth * 260 * projected.scale);
     const visualWidth = collisionWidth * 1.08;
-    const binHeight = Math.max(46, this.stage.bin.openingHeight * 220 * binCenter.scale);
+    const binHeight = Math.max(46, this.stage.bin.openingHeight * 220 * projected.scale);
     const bucketHeight = binHeight * 1.2;
 
     this.graphics.fillStyle(0x6a4f38, 0.22);
@@ -179,12 +194,29 @@ export class StageRenderer {
   }
 
   private toScreen(position: Vec3): ScreenPoint {
-    const projected = projectWorldToScreen(position);
+    const viewport = this.getViewport();
+    const layout = createDeskLayout(viewport);
+    const projected = projectDeskPoint(position, viewport);
+    const spawnProjected = projectDeskPoint(this.stage.paper.spawn, viewport);
+    const offsetX = layout.paperAnchor.x - spawnProjected.x;
+    const offsetY = layout.paperAnchor.y - spawnProjected.y;
+
     return {
-      x: this.scene.scale.width * 0.5 + projected.x,
-      y: this.scene.scale.height * 0.8 + projected.y,
+      x: projected.x + offsetX,
+      y: projected.y + offsetY,
       scale: projected.scale,
     };
+  }
+
+  private getViewport(): RenderViewport {
+    return {
+      width: this.scene.scale.width,
+      height: this.scene.scale.height,
+    };
+  }
+
+  private getLayout() {
+    return createDeskLayout(this.getViewport());
   }
 }
 
