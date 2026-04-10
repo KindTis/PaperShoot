@@ -1,6 +1,7 @@
 import { updateBinState } from '../collision/binStateMachine';
 import { selectFailureReason } from '../scoring/selectFailureReason';
 import type { FailureReason, StageConfig, Vec3 } from '../contracts';
+import type { DragLaunchPayload } from '../input/DragThrowController';
 import { ThrowInputController } from '../input/ThrowInputController';
 import { getObstacleWorldPose } from '../obstacles/getObstacleWorldPose';
 import { advanceThrowStep } from '../simulation/advanceThrowStep';
@@ -147,6 +148,31 @@ export class StageRuntime {
     });
 
     this.input.confirmPower();
+    this.throwIndex += 1;
+    this.activeBody = {
+      position: cloneVec3(this.stage.paper.spawn),
+      velocity: launchVector,
+      elapsedMs: 0,
+      binState: 'Outside',
+      insideBinMs: 0,
+    };
+  }
+
+  releaseDragThrow(launch: DragLaunchPayload | null): void {
+    if (!launch || this.stageStatus !== 'playing') {
+      return;
+    }
+
+    const actualPower =
+      this.stage.power.minPower + (this.stage.power.maxPower - this.stage.power.minPower) * launch.power01;
+    const launchVector = createLaunchVector({
+      yawDeg: launch.yawDeg,
+      pitchDeg: launch.pitchDeg,
+      power: actualPower,
+      minPower: this.stage.power.minPower,
+      maxPower: this.stage.power.maxPower,
+    });
+
     this.throwIndex += 1;
     this.activeBody = {
       position: cloneVec3(this.stage.paper.spawn),
