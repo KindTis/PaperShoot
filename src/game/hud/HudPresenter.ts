@@ -27,5 +27,10 @@ export class HudPresenter {
     this.root.powerValue.textContent = view.powerText;
     this.root.failureReason.textContent = view.failureReasonText;
     this.root.resultBanner.textContent = view.resultBannerText;
+    this.root.debugStrip.hidden =
+      view.aimText.trim().length === 0 &&
+      view.powerText.trim().length === 0 &&
+      view.failureReasonText.trim().length === 0;
+    this.root.resultBanner.hidden = view.resultBannerText.trim().length === 0;
   }
 }

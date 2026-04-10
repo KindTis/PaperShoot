@@ -4,6 +4,7 @@ export interface HudRoot {
   throwValue: HTMLElement;
   successValue: HTMLElement;
   windValue: HTMLElement;
+  debugStrip: HTMLDivElement;
   aimValue: HTMLElement;
   powerValue: HTMLElement;
   failureReason: HTMLElement;
@@ -38,12 +39,12 @@ export function createHudRoot(doc: Document): HudRoot {
     <div class="hud-side">
       <span data-role="wind"></span>
     </div>
-    <div class="hud-bottom">
+    <div class="hud-bottom" data-role="debug-strip" hidden>
       <span data-role="aim"></span>
       <span data-role="power"></span>
       <span data-role="failure"></span>
     </div>
-    <div class="hud-actions">
+    <div class="hud-actions" hidden>
       <button type="button" data-role="confirm-aim">Confirm</button>
       <button type="button" data-role="confirm-power">Throw</button>
       <button type="button" data-role="retry">Retry</button>
@@ -57,6 +58,7 @@ export function createHudRoot(doc: Document): HudRoot {
     throwValue: mustQuery(root, '[data-role="throws"]'),
     successValue: mustQuery(root, '[data-role="success"]'),
     windValue: mustQuery(root, '[data-role="wind"]'),
+    debugStrip: mustQuery(root, '[data-role="debug-strip"]'),
     aimValue: mustQuery(root, '[data-role="aim"]'),
     powerValue: mustQuery(root, '[data-role="power"]'),
     failureReason: mustQuery(root, '[data-role="failure"]'),

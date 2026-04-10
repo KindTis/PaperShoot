@@ -114,12 +114,14 @@ const createConfig = (): StageConfig => ({
     showFailureReason: true,
     showAimReticle: true,
   },
+  inputMode: 'drag_release',
+  artTheme: 'desk-diorama-paper',
   score: {
     mode: 'binary_success',
     successValue: 1,
     failureValue: 0,
   },
-  cameraPreset: 'semi-fps-default',
+  cameraPreset: 'desk-diorama-low',
   clearConditionText: '1 success in 3 throws',
 });
 
