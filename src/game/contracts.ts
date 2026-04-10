@@ -105,12 +105,14 @@ export interface StageConfig {
     showFailureReason: boolean;
     showAimReticle: boolean;
   };
+  inputMode: 'drag_release';
+  artTheme: 'desk-diorama-paper';
   score: {
     mode: 'binary_success';
     successValue: 1;
     failureValue: 0;
   };
-  cameraPreset: 'semi-fps-default';
+  cameraPreset: 'desk-diorama-low';
   tutorialText?: string;
   clearConditionText: string;
 }

@@ -50,6 +50,8 @@ export function buildBaseStage(input: BaseStageInput): StageConfig {
       settleTimeMs: 120,
     },
     assists: { showGuideArc: true, showFailureReason: true, showAimReticle: true },
-    cameraPreset: 'semi-fps-default',
+    inputMode: 'drag_release',
+    artTheme: 'desk-diorama-paper',
+    cameraPreset: 'desk-diorama-low',
   };
 }
