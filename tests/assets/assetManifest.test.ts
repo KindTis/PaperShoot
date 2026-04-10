@@ -78,24 +78,139 @@ function isZeroOpacity(tag: string): boolean {
   return Number.isFinite(parsed) && parsed <= 0;
 }
 
-function isFullCanvasRect(rectTag: string, svgText: string): boolean {
+type ViewBox = Readonly<{
+  minX: number;
+  minY: number;
+  width: number;
+  height: number;
+  maxX: number;
+  maxY: number;
+}>;
+
+function parseViewBox(svgText: string): ViewBox | undefined {
   const viewBoxMatch = svgText.match(/viewBox\s*=\s*["']([^"']+)["']/i);
   if (!viewBoxMatch) {
-    return false;
+    return undefined;
   }
 
   const parts = viewBoxMatch[1].trim().split(/\s+/).map((v) => Number.parseFloat(v));
   if (parts.length !== 4 || parts.some((value) => Number.isNaN(value))) {
-    return false;
+    return undefined;
   }
 
-  const [, , vbWidth, vbHeight] = parts;
+  const [minX, minY, width, height] = parts;
+  return {
+    minX,
+    minY,
+    width,
+    height,
+    maxX: minX + width,
+    maxY: minY + height,
+  };
+}
+
+function isNearlyEqual(left: number, right: number, epsilon: number = 0.001): boolean {
+  return Math.abs(left - right) <= epsilon;
+}
+
+function readFillValue(tag: string): string | undefined {
+  const style = readAttribute(tag, 'style') ?? '';
+  return readAttribute(tag, 'fill') ?? readStyleValue(style, 'fill');
+}
+
+function isFullCanvasRect(rectTag: string, viewBox: ViewBox): boolean {
   const x = Number.parseFloat(readAttribute(rectTag, 'x') ?? '0');
   const y = Number.parseFloat(readAttribute(rectTag, 'y') ?? '0');
   const width = Number.parseFloat(readAttribute(rectTag, 'width') ?? 'NaN');
   const height = Number.parseFloat(readAttribute(rectTag, 'height') ?? 'NaN');
 
-  return x === 0 && y === 0 && width === vbWidth && height === vbHeight;
+  return (
+    isNearlyEqual(x, viewBox.minX) &&
+    isNearlyEqual(y, viewBox.minY) &&
+    isNearlyEqual(width, viewBox.width) &&
+    isNearlyEqual(height, viewBox.height)
+  );
+}
+
+function parsePolygonPoints(pointsValue: string): Array<{ x: number; y: number }> {
+  const matches = [...pointsValue.matchAll(/(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)/g)];
+  return matches.map((match) => ({
+    x: Number.parseFloat(match[1]),
+    y: Number.parseFloat(match[2]),
+  }));
+}
+
+function hasPoint(points: Array<{ x: number; y: number }>, x: number, y: number): boolean {
+  return points.some((point) => isNearlyEqual(point.x, x) && isNearlyEqual(point.y, y));
+}
+
+function isFullCanvasPolygon(polygonTag: string, viewBox: ViewBox): boolean {
+  const pointsValue = readAttribute(polygonTag, 'points');
+  if (!pointsValue) {
+    return false;
+  }
+
+  const points = parsePolygonPoints(pointsValue);
+  if (points.length < 4) {
+    return false;
+  }
+
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+
+  return (
+    isNearlyEqual(minX, viewBox.minX) &&
+    isNearlyEqual(maxX, viewBox.maxX) &&
+    isNearlyEqual(minY, viewBox.minY) &&
+    isNearlyEqual(maxY, viewBox.maxY) &&
+    hasPoint(points, viewBox.minX, viewBox.minY) &&
+    hasPoint(points, viewBox.maxX, viewBox.minY) &&
+    hasPoint(points, viewBox.maxX, viewBox.maxY) &&
+    hasPoint(points, viewBox.minX, viewBox.maxY)
+  );
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+}
+
+function numberPattern(value: number): string {
+  const base = `${value}`;
+  const escaped = escapeRegex(base);
+  if (Number.isInteger(value)) {
+    return `(?:${escaped}(?:\\.0+)?)`;
+  }
+  return escaped;
+}
+
+function isFullCanvasPath(pathTag: string, viewBox: ViewBox): boolean {
+  const d = readAttribute(pathTag, 'd');
+  if (!d) {
+    return false;
+  }
+
+  const n = {
+    minX: numberPattern(viewBox.minX),
+    minY: numberPattern(viewBox.minY),
+    maxX: numberPattern(viewBox.maxX),
+    maxY: numberPattern(viewBox.maxY),
+  };
+
+  const separator = '[\\s,]+';
+  const lineRectPattern = new RegExp(
+    `^\\s*M\\s*${n.minX}${separator}${n.minY}\\s*L\\s*${n.maxX}${separator}${n.minY}\\s*L\\s*${n.maxX}${separator}${n.maxY}\\s*L\\s*${n.minX}${separator}${n.maxY}(?:\\s*L\\s*${n.minX}${separator}${n.minY})?\\s*Z\\s*$`,
+    'i',
+  );
+  const hvRectPattern = new RegExp(
+    `^\\s*M\\s*${n.minX}${separator}${n.minY}\\s*H\\s*${n.maxX}\\s*V\\s*${n.maxY}\\s*H\\s*${n.minX}(?:\\s*V\\s*${n.minY})?\\s*Z\\s*$`,
+    'i',
+  );
+
+  return lineRectPattern.test(d) || hvRectPattern.test(d);
 }
 
 function hasOpaqueStyleBackground(svgText: string): boolean {
@@ -129,9 +244,14 @@ function hasDisallowedOpaqueBackground(svgText: string): boolean {
     return true;
   }
 
+  const viewBox = parseViewBox(svgText);
+  if (!viewBox) {
+    return false;
+  }
+
   const rectTags = [...svgText.matchAll(/<rect\b[^>]*>/gi)].map((match) => match[0]);
   for (const rectTag of rectTags) {
-    if (!isFullCanvasRect(rectTag, svgText)) {
+    if (!isFullCanvasRect(rectTag, viewBox)) {
       continue;
     }
 
@@ -139,9 +259,37 @@ function hasDisallowedOpaqueBackground(svgText: string): boolean {
       continue;
     }
 
-    const style = readAttribute(rectTag, 'style') ?? '';
-    const fill = readAttribute(rectTag, 'fill') ?? readStyleValue(style, 'fill');
-    if (isOpaquePaint(fill)) {
+    if (isOpaquePaint(readFillValue(rectTag))) {
+      return true;
+    }
+  }
+
+  const pathTags = [...svgText.matchAll(/<path\b[^>]*>/gi)].map((match) => match[0]);
+  for (const pathTag of pathTags) {
+    if (!isFullCanvasPath(pathTag, viewBox)) {
+      continue;
+    }
+
+    if (isZeroOpacity(pathTag)) {
+      continue;
+    }
+
+    if (isOpaquePaint(readFillValue(pathTag))) {
+      return true;
+    }
+  }
+
+  const polygonTags = [...svgText.matchAll(/<polygon\b[^>]*>/gi)].map((match) => match[0]);
+  for (const polygonTag of polygonTags) {
+    if (!isFullCanvasPolygon(polygonTag, viewBox)) {
+      continue;
+    }
+
+    if (isZeroOpacity(polygonTag)) {
+      continue;
+    }
+
+    if (isOpaquePaint(readFillValue(polygonTag))) {
       return true;
     }
   }
@@ -218,10 +366,14 @@ describe('assetManifest', () => {
   it('detects opaque background patterns with pragmatic heuristics', () => {
     const opaqueRectSvg = '<svg viewBox="0 0 100 100"><rect x="0" y="0" width="100" height="100" fill="#ffffff"/></svg>';
     const opaqueStyleSvg = '<svg style="background: rgb(255, 255, 255)"></svg>';
+    const opaquePathSvg = '<svg viewBox="0 0 100 100"><path d="M0 0 H100 V100 H0 Z" fill="#ffffff"/></svg>';
+    const opaquePolygonSvg = '<svg viewBox="0 0 100 100"><polygon points="0,0 100,0 100,100 0,100" fill="#ffffff"/></svg>';
     const transparentSvg = '<svg viewBox="0 0 100 100"><rect width="20" height="20" fill="#ffffff"/></svg>';
 
     expect(hasDisallowedOpaqueBackground(opaqueRectSvg)).toBe(true);
     expect(hasDisallowedOpaqueBackground(opaqueStyleSvg)).toBe(true);
+    expect(hasDisallowedOpaqueBackground(opaquePathSvg)).toBe(true);
+    expect(hasDisallowedOpaqueBackground(opaquePolygonSvg)).toBe(true);
     expect(hasDisallowedOpaqueBackground(transparentSvg)).toBe(false);
   });
 
