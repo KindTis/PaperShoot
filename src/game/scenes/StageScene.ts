@@ -46,10 +46,15 @@ export class StageScene extends Phaser.Scene {
   }
 
   private bindDragInput(): void {
-    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      const normalized = this.normalizePointer(pointer);
+    const canvas = this.game.canvas as HTMLCanvasElement | null;
+    if (!canvas) {
+      return;
+    }
+
+    const onPointerDown = (event: PointerEvent) => {
+      const normalized = this.normalizeDomPointer(canvas, event);
       const snapshot = this.runtime.getSnapshot();
-      if (pointer.button !== 0 || snapshot.stageStatus !== 'playing') {
+      if (event.button !== 0 || snapshot.stageStatus !== 'playing') {
         return;
       }
 
@@ -65,18 +70,40 @@ export class StageScene extends Phaser.Scene {
         return;
       }
 
+      event.preventDefault();
+      canvas.setPointerCapture?.(event.pointerId);
       this.dragController.beginDrag(normalized);
-    });
+    };
 
-    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      this.dragController.updateDrag(this.normalizePointer(pointer));
-    });
+    const onPointerMove = (event: PointerEvent) => {
+      this.dragController.updateDrag(this.normalizeDomPointer(canvas, event));
+    };
 
-    this.input.on('pointerup', () => {
+    const onPointerUp = (event: PointerEvent) => {
+      event.preventDefault();
       this.runtime.releaseDragThrow(this.dragController.releaseDrag());
-    });
-    this.input.on('pointerupoutside', () => {
+      canvas.releasePointerCapture?.(event.pointerId);
+    };
+
+    const onPointerCancel = (event: PointerEvent) => {
+      event.preventDefault();
       this.dragController.releaseDrag();
+      canvas.releasePointerCapture?.(event.pointerId);
+    };
+
+    canvas.style.touchAction = 'none';
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('pointercancel', onPointerCancel);
+    canvas.addEventListener('pointerleave', onPointerCancel);
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerup', onPointerUp);
+      canvas.removeEventListener('pointercancel', onPointerCancel);
+      canvas.removeEventListener('pointerleave', onPointerCancel);
     });
   }
 
@@ -138,10 +165,11 @@ export class StageScene extends Phaser.Scene {
     };
   }
 
-  private normalizePointer(pointer: Phaser.Input.Pointer): { x: number; y: number } {
+  private normalizeDomPointer(canvas: HTMLCanvasElement, event: PointerEvent): { x: number; y: number } {
+    const rect = canvas.getBoundingClientRect();
     return {
-      x: Phaser.Math.Clamp(pointer.x / Math.max(1, this.scale.width), 0, 1),
-      y: Phaser.Math.Clamp(pointer.y / Math.max(1, this.scale.height), 0, 1),
+      x: Phaser.Math.Clamp((event.clientX - rect.left) / Math.max(1, rect.width), 0, 1),
+      y: Phaser.Math.Clamp((event.clientY - rect.top) / Math.max(1, rect.height), 0, 1),
     };
   }
 }
