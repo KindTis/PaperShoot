@@ -188,6 +188,8 @@ expect(applyWindZone({ bodyPosition: { x: 0, y: 1.4, z: 6.8 }, fan: forwardFan }
 const center = applyWindZone({ bodyPosition: { x: 0.0, y: 1.4, z: 3.4 }, fan: forwardFan });
 const edge = applyWindZone({ bodyPosition: { x: 1.29, y: 1.4, z: 3.4 }, fan: forwardFan });
 expect(Math.abs(edge.windTargetX)).toBeLessThan(Math.abs(center.windTargetX));
+expect(Math.abs(edge.windTargetX)).toBeGreaterThan(Math.abs(center.windTargetX) * 0.25);
+expect(Math.abs(edge.windTargetX)).toBeLessThan(Math.abs(center.windTargetX) * 0.75);
 expect(edge.gravityScale).toBeGreaterThan(center.gravityScale);
 expect(advanceThrowStep(input).velocity.y).toBeGreaterThanOrEqual(-18);
 ```
@@ -212,6 +214,7 @@ velocity.x += (windTargetX - velocity.x) * windResponse * dtSec;
 velocity.y = Math.max(velocity.y, maxFallSpeed);
 // local +z = influenceLength, local x/y = width/height, feather는 경계 선형 감쇠로 적용
 // feather 구간에서는 windTargetX 절대값이 중심보다 작아지고 gravityScale은 1.0에 가까워져야 한다
+// 첫 버전에서는 feather edge strength를 center strength의 25%~75% 범위로 유지한다
 ```
 
 - [ ] **Step 4: 시뮬레이션 테스트를 통과시킨다**
@@ -268,6 +271,18 @@ expect(root.aimValue.textContent).toContain('Yaw +6');
 expect(root.powerValue.textContent).toContain('74%');
 expect(root.failureReason.textContent).toContain('장애물');
 expect(root.resultBanner.textContent).toBe('');
+
+presenter.render({
+  stageLabel: 'Stage 3',
+  throwText: '2 / 4',
+  successText: '1 / 1',
+  windText: '강한 바람 / 오른쪽',
+  aimText: 'Yaw +4 / Pitch 30',
+  powerText: 'Power 68%',
+  failureReasonText: '',
+  resultBannerText: '성공',
+});
+expect(root.resultBanner.textContent).toBe('성공');
 ```
 
 ```ts
@@ -290,6 +305,25 @@ root.retryButton.click();
 expect(controller.getSnapshot().phase).toBe('aim');
 ```
 
+```ts
+const pointerInput = createPointerInputStub();
+const keyboard = createKeyboardStub();
+const desktopController = new ThrowInputController(config);
+
+desktopController.bindMouseHandlers(pointerInput);
+desktopController.bindKeyboardHandlers(keyboard);
+
+pointerInput.move({ normalizedX: 0.7, normalizedY: 0.3 });
+pointerInput.leftClick();
+expect(desktopController.getSnapshot().phase).toBe('power');
+
+keyboard.press('Space');
+expect(desktopController.getSnapshot().phase).toBe('flying');
+
+keyboard.press('R');
+expect(desktopController.getSnapshot().phase).toBe('aim');
+```
+
 - [ ] **Step 2: 테스트가 실패하는지 확인한다**
 
 ```bash
@@ -308,7 +342,8 @@ export class ThrowInputController {
   confirmPower(): void { if (this.phase === 'power') this.phase = 'flying'; }
   resetForRetry(): void { this.phase = 'aim'; this.power = this.config.startPower; }
   getSnapshot(): ThrowInputSnapshot { /* phase, yawDeg, pitchDeg, power 반환 */ }
-  bindPointerHandlers(input: Phaser.Input.InputPlugin): void { /* mouse + keyboard 연결 */ }
+  bindMouseHandlers(input: Phaser.Input.InputPlugin): void { /* pointer move + click 연결 */ }
+  bindKeyboardHandlers(keyboard: Phaser.Input.Keyboard.KeyboardPlugin): void { /* arrows/WASD + Space + R 연결 */ }
   bindTouchButtons(buttons: {
     confirmAimButton: HTMLButtonElement;
     confirmPowerButton: HTMLButtonElement;
@@ -395,12 +430,22 @@ git commit -m "feat: add throw input controller and DOM HUD shell"
 | 플랫폼 | 조준 | 1차 확정 | 파워 진행 | 2차 확정 | 재시도 |
 | --- | --- | --- | --- | --- | --- |
 | Mouse | 포인터 이동 | 좌클릭 | 자동 ping-pong | 좌클릭 | `R` |
-| Touch | 좌측 플레이필드 드래그 | 우하단 `확정` 버튼 탭 | 자동 ping-pong | 우하단 `던지기` 버튼 탭 | 좌하단 `재시도` 버튼 탭 |
+| Touch | 좌측 플레이필드 드래그 | 우하단 `확정` 버튼 탭 | 자동 ping-pong | 우하단 `던지기` 버튼 탭 | 우하단 `재시도` 버튼 탭 |
 | Keyboard | 화살표/WASD | `Space` | 자동 ping-pong | `Space` | `R` |
 
 모든 플랫폼은 동일한 `confirmAim -> confirmPower` 상태 머신을 공유한다.
 터치는 `손을 떼면 확정`을 쓰지 않는다. 의도치 않은 확정을 막기 위해 명시적 버튼으로만 확정한다.
 `createHudRoot()`는 touch 액션 버튼을 항상 만들고, `ThrowInputController.bindTouchButtons()`가 이 버튼들을 상태 머신에 연결한다.
+
+### Task 3 HUD 레이아웃 계약
+
+- desktop persistent HUD는 viewport의 `20%` 이내로 유지한다.
+- mobile persistent HUD는 viewport의 `28%` 이내로 유지한다.
+- 화면 중앙 `40%` 폭과 하단 중앙 투척 경로는 상시 비운다.
+- `hud-top`은 safe-area 포함 최대 `72px` desktop / `96px` mobile 높이로 제한한다.
+- `hud-side`는 desktop에서만 우측 edge에 유지하고, mobile에서는 top strip 아래로 접는다.
+- `hud-actions`는 mobile에서 우하단 safe-area 스택으로 배치하고, 조준 드래그 입력은 좌측 `65~70%` playfield 영역으로 제한한다.
+- 액션 버튼은 최소 `48x48px`, 버튼 간격은 `12px` 이상으로 유지한다.
 
 ### Task 4: StageRepository와 Stage 1~3 데이터 구현
 
@@ -516,14 +561,7 @@ return null;
 ```
 
 ```ts
-if (crossedOpeningPlaneDownward && horizontalOffset <= openingWidth / 2 && speed >= entrySpeedMin && speed <= entrySpeedMax) {
-  return { state: 'EntryCandidate', suppressWorldFloorFailure: false };
-}
-
-if (speed < entrySpeedMin || speed > entrySpeedMax || horizontalOffset > openingWidth / 2) {
-  return { state: 'RimContact', suppressWorldFloorFailure: false };
-}
-
+// desiredInwardOffset는 림 또는 입구 중심선 기준으로 측정한 "현재 x 오차를 안쪽으로 얼마나 줄일지"의 후보값이다.
 const allowAssist = currentState === 'RimContact' || currentState === 'EntryCandidate';
 const inwardAssistOffset = allowAssist
   ? clamp(desiredInwardOffset, 0, entryAssistRadius)
@@ -531,6 +569,14 @@ const inwardAssistOffset = allowAssist
 
 // 보정은 x 위치에만 적용하고 openingWidth 자체는 넓히지 않는다.
 const assistedHorizontalOffset = Math.max(0, horizontalOffset - inwardAssistOffset);
+
+if (crossedOpeningPlaneDownward && assistedHorizontalOffset <= openingWidth / 2 && speed >= entrySpeedMin && speed <= entrySpeedMax) {
+  return { state: 'EntryCandidate', suppressWorldFloorFailure: false };
+}
+
+if (speed < entrySpeedMin || speed > entrySpeedMax || assistedHorizontalOffset > openingWidth / 2) {
+  return { state: 'RimContact', suppressWorldFloorFailure: false };
+}
 
 if (enteredInnerVolume && (insideTimeMs >= settleTimeMs || depthBelowOpening >= depthTolerance)) {
   return { state: 'SuccessLatched', suppressWorldFloorFailure: true };
@@ -541,13 +587,14 @@ const bounced = reflect(relative, obstacleNormal, restitution);
 return add(applyTangentialDamping(bounced, tangentialDamping), obstacleSurfaceVelocity);
 ```
 
-Task 5는 반드시 아래 4경로를 각각 독립 테스트로 고정한다.
+Task 5는 반드시 아래 경로와 제약을 각각 독립 테스트로 고정한다.
 1. 림에 맞고 튕겨 실패
 2. 유효 속도로 입구 평면을 통과해 진입 후보
 3. 내부 정착 시간 또는 깊이 조건으로 성공 래치
 4. `InsideBin` 이후 월드 바닥 실패 억제 + `bin` 로컬 바닥 처리
-5. `entryAssistRadius`는 입구 폭을 넓히지 않고, 이미 진입 후보가 된 샷에만 미세 보정으로 작동
+5. `entryAssistRadius`는 입구 폭을 넓히지 않고, `RimContact` 또는 `EntryCandidate` 상태의 샷에만 미세 보정으로 작동
 6. `entryAssistRadius`는 위치 보정량 상한이며 속도 보정에는 쓰지 않는다
+7. `desiredInwardOffset`는 입구 중심선 또는 림 접촉 후 계산한 x 오차에서만 도출하며, y/z 보정에는 쓰지 않는다
 
 - [ ] **Step 4: 충돌/판정 테스트를 통과시킨다**
 
@@ -588,6 +635,7 @@ expect(runtime.getSnapshot().input.phase).toBe('aim');
 expect(runtime.getSnapshot().activeBody).toBeNull();
 expect(runtime.getSnapshot().failureReason).toBe(null);
 expect(runtime.getSnapshot().resultOverlay.kind).toBe(null);
+expect(runtime.getSnapshot().resultOverlay.text).toBe('');
 ```
 
 ```ts
@@ -599,6 +647,13 @@ expect(successRuntime.getSnapshot().activeBody?.position).toEqual(stageCatalog[0
 successRuntime.applyThrowResolution({ success: true, failureReason: null });
 expect(successRuntime.getSnapshot().successCount).toBe(1);
 expect(successRuntime.getSnapshot().stageStatus).toBe('cleared');
+expect(successRuntime.getSnapshot().resultOverlay.kind).toBe('success');
+successRuntime.tick(320);
+expect(successRuntime.getSnapshot().resultOverlay.kind).toBe(null);
+expect(successRuntime.consumeShellEvent()).toEqual({
+  type: 'stage_cleared',
+  stageId: stageCatalog[0].id,
+});
 ```
 
 ```ts
@@ -615,11 +670,21 @@ expect(failureRuntime.getSnapshot().resultOverlay.kind).toBe(null);
 ```
 
 ```ts
+const singleThrowStage = {
+  ...stageCatalog[0],
+  id: 'stage-01-single-throw',
+  clear: { throwLimit: 1, requiredSuccesses: 1 },
+};
+
 const failStageRuntime = new StageRuntime(singleThrowStage);
 failStageRuntime.confirmAim();
 failStageRuntime.confirmPower();
 failStageRuntime.applyThrowResolution({ success: false, failureReason: 'ground_hit' });
 expect(failStageRuntime.getSnapshot().stageStatus).toBe('failed');
+expect(failStageRuntime.consumeShellEvent()).toEqual({
+  type: 'stage_failed',
+  stageId: singleThrowStage.id,
+});
 ```
 
 - [ ] **Step 2: 테스트가 실패하는지 확인한다**
@@ -650,7 +715,8 @@ export class StageRuntime {
   confirmAim(): void { this.input.confirmAim(); }
   confirmPower(): void { /* input snapshot으로 launch vector 계산 후 paper.spawn에서 body 생성 */ }
   applyThrowResolution(result: { success: boolean; failureReason: FailureReason }): void { /* successCount, remainingThrows, overlay, stageStatus 갱신 */ }
-  retryThrow(): void { this.activeBody = null; this.failureReason = null; this.input.resetForRetry(); }
+  retryThrow(): void { this.activeBody = null; this.failureReason = null; this.resultOverlay = { kind: null, text: '' }; this.input.resetForRetry(); }
+  consumeShellEvent(): { type: 'stage_cleared' | 'stage_failed'; stageId: string } | null { /* success는 overlay 종료 후, failed는 throwLimit 소진 직후 1회 소비 */ }
   getSnapshot(): RuntimeSnapshot {
     return {
       worldTimeMs: this.worldTimeMs,
@@ -681,13 +747,25 @@ update(_time: number, delta: number): void {
 }
 ```
 
+```ts
+// StageRenderer 계약
+// visual opening centerline은 collision opening centerline과 동일해야 한다.
+// opening width만 collision width의 1.08x로 렌더링하고, rim thickness와 inner depth는 과장하지 않는다.
+// projected paper sprite center는 projected paper proxy center를 그대로 사용한다.
+// paper sprite visual diameter는 proxy diameter의 1.05~1.10 범위로 제한한다.
+// sprite 회전은 pivot 기준 회전만 허용하고, 중심 이동처럼 보이는 wobble translation은 금지한다.
+```
+
 Task 6은 아래를 반드시 검증한다.
 - 실패 시 throw 소모와 `failureReason` 반영
 - 성공 시 `successCount` 증가와 clear 조건 판정
 - success/failure result overlay는 월드를 멈추지 않고 0.3초 내외로 사라짐
-- stage clear/fail 후 `GameShell`로 전이 이벤트를 올림
-- 쓰레기통의 시각 입구 폭은 실제 충돌 폭의 `1.08x`로 렌더링
+- success clear 전이는 success overlay 종료 직후 `GameShell`로 올림
+- stage fail 전이는 throwLimit 소진 직후 `GameShell`로 올림
+- 쓰레기통의 시각 입구 폭은 실제 충돌 폭의 `1.08x`로 렌더링하되 centerline은 동일하게 유지
+- visual opening center와 collision opening center의 스크린 공간 오차는 `<= 4px @1080p`
 - 종이 스프라이트는 시각 연출용이고, 판정은 항상 `paper.radius` 구형 프록시를 사용
+- sprite center와 proxy center의 스크린 공간 오차는 정지 시 `<= 3px @1080p`, 비행 중 `<= proxy diameter의 10%`
 
 - [ ] **Step 4: runtime 통합 테스트를 통과시키고 빌드한다**
 
@@ -785,11 +863,13 @@ expect(stageCatalog.every((stage) => stage.score.mode === 'binary_success')).toB
 # PaperShoot MVP Smoke Checklist
 - Desktop 1280px 이상에서 HUD가 캔버스를 가리지 않는가
 - 모바일 390x844 기준에서 상단/우측/하단 HUD가 모두 보이는가
+- desktop persistent HUD가 viewport 20% 이내이고 중앙 40% 폭을 가리지 않는가
+- mobile persistent HUD가 viewport 28% 이내이고 조준 드래그 영역과 버튼 영역이 겹치지 않는가
 - Stage 3에서 장애물 실패 이유가 `장애물`로 보이는가
 - Stage 5에서 retry 후에도 이동 장애물 위상이 유지되는가
 - Stage 6에서 좁은 입구 통과 후 `InsideBin` 성공이 자연스럽게 보이는가
-- 쓰레기통 시각 입구 폭이 실제 충돌 폭의 `1.08x`로 보이는가
-- 종이 스프라이트와 `paper.radius` 프록시 중심이 눈에 띄게 어긋나지 않는가
+- 쓰레기통 시각 입구 폭이 실제 충돌 폭의 `1.08x`로 보이되 centerline mismatch가 `<= 4px @1080p`인가
+- 종이 스프라이트와 `paper.radius` 프록시 중심 오차가 정지 시 `<= 3px @1080p`, 비행 중 `<= proxy diameter의 10%`인가
 ```
 
 - [ ] **Step 2: 전체 테스트 스위트를 실행한다**
@@ -816,6 +896,8 @@ Expected: `vite build completed successfully`, `local dev server starts without 
 - [ ] Mobile HUD overlap check
 - [ ] Stage 5 retry continuity check
 - [ ] Stage 6 narrow gate success check
+- [ ] Visual/collision bin centerline check (`<= 4px @1080p`)
+- [ ] Sprite/proxy center alignment check (idle `<= 3px`, flight `<= 10% diameter`)
 - Evidence:
   - Device:
   - Build SHA:
