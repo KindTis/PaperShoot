@@ -185,6 +185,10 @@ expect(applyWindZone({ bodyPosition: { x: 0, y: 1.4, z: 3.4 }, fan: rightFan }).
 expect(applyWindZone({ bodyPosition: { x: 1.29, y: 1.4, z: 3.4 }, fan: forwardFan }).windTargetX).toBeLessThan(0);
 expect(applyWindZone({ bodyPosition: { x: 1.6, y: 1.4, z: 3.4 }, fan: forwardFan }).windTargetX).toBe(0);
 expect(applyWindZone({ bodyPosition: { x: 0, y: 1.4, z: 6.8 }, fan: forwardFan }).gravityScale).toBe(1);
+const center = applyWindZone({ bodyPosition: { x: 0.0, y: 1.4, z: 3.4 }, fan: forwardFan });
+const edge = applyWindZone({ bodyPosition: { x: 1.29, y: 1.4, z: 3.4 }, fan: forwardFan });
+expect(Math.abs(edge.windTargetX)).toBeLessThan(Math.abs(center.windTargetX));
+expect(edge.gravityScale).toBeGreaterThan(center.gravityScale);
 expect(advanceThrowStep(input).velocity.y).toBeGreaterThanOrEqual(-18);
 ```
 
@@ -207,6 +211,7 @@ velocity.y += gravityY * gravityScale * dtSec;
 velocity.x += (windTargetX - velocity.x) * windResponse * dtSec;
 velocity.y = Math.max(velocity.y, maxFallSpeed);
 // local +z = influenceLength, local x/y = width/height, feather는 경계 선형 감쇠로 적용
+// feather 구간에서는 windTargetX 절대값이 중심보다 작아지고 gravityScale은 1.0에 가까워져야 한다
 ```
 
 - [ ] **Step 4: 시뮬레이션 테스트를 통과시킨다**
@@ -263,6 +268,26 @@ expect(root.aimValue.textContent).toContain('Yaw +6');
 expect(root.powerValue.textContent).toContain('74%');
 expect(root.failureReason.textContent).toContain('장애물');
 expect(root.resultBanner.textContent).toBe('');
+```
+
+```ts
+const root = createHudRoot(document);
+const controller = new ThrowInputController(config);
+
+controller.bindTouchButtons({
+  confirmAimButton: root.confirmAimButton,
+  confirmPowerButton: root.confirmPowerButton,
+  retryButton: root.retryButton,
+});
+
+root.confirmAimButton.click();
+expect(controller.getSnapshot().phase).toBe('power');
+
+root.confirmPowerButton.click();
+expect(controller.getSnapshot().phase).toBe('flying');
+
+root.retryButton.click();
+expect(controller.getSnapshot().phase).toBe('aim');
 ```
 
 - [ ] **Step 2: 테스트가 실패하는지 확인한다**
@@ -500,7 +525,12 @@ if (speed < entrySpeedMin || speed > entrySpeedMax || horizontalOffset > opening
 }
 
 const allowAssist = currentState === 'RimContact' || currentState === 'EntryCandidate';
-const inwardAssist = allowAssist ? clamp(entryAssistRadius, 0, rimThickness) : 0;
+const inwardAssistOffset = allowAssist
+  ? clamp(desiredInwardOffset, 0, entryAssistRadius)
+  : 0;
+
+// 보정은 x 위치에만 적용하고 openingWidth 자체는 넓히지 않는다.
+const assistedHorizontalOffset = Math.max(0, horizontalOffset - inwardAssistOffset);
 
 if (enteredInnerVolume && (insideTimeMs >= settleTimeMs || depthBelowOpening >= depthTolerance)) {
   return { state: 'SuccessLatched', suppressWorldFloorFailure: true };
@@ -517,6 +547,7 @@ Task 5는 반드시 아래 4경로를 각각 독립 테스트로 고정한다.
 3. 내부 정착 시간 또는 깊이 조건으로 성공 래치
 4. `InsideBin` 이후 월드 바닥 실패 억제 + `bin` 로컬 바닥 처리
 5. `entryAssistRadius`는 입구 폭을 넓히지 않고, 이미 진입 후보가 된 샷에만 미세 보정으로 작동
+6. `entryAssistRadius`는 위치 보정량 상한이며 속도 보정에는 쓰지 않는다
 
 - [ ] **Step 4: 충돌/판정 테스트를 통과시킨다**
 
@@ -550,10 +581,13 @@ const runtime = new StageRuntime(stageCatalog[0]);
 runtime.tick(1000 / 60);
 runtime.confirmAim();
 runtime.confirmPower();
+runtime.applyThrowResolution({ success: false, failureReason: 'ground_hit' });
 runtime.retryThrow();
 expect(runtime.getSnapshot().worldTimeMs).toBeGreaterThan(0);
 expect(runtime.getSnapshot().input.phase).toBe('aim');
 expect(runtime.getSnapshot().activeBody).toBeNull();
+expect(runtime.getSnapshot().failureReason).toBe(null);
+expect(runtime.getSnapshot().resultOverlay.kind).toBe(null);
 ```
 
 ```ts
@@ -571,11 +605,21 @@ expect(successRuntime.getSnapshot().stageStatus).toBe('cleared');
 const failureRuntime = new StageRuntime(stageCatalog[0]);
 failureRuntime.confirmAim();
 failureRuntime.confirmPower();
+const before = failureRuntime.getSnapshot().remainingThrows;
 failureRuntime.applyThrowResolution({ success: false, failureReason: 'ground_hit' });
-expect(failureRuntime.getSnapshot().remainingThrows).toBeGreaterThanOrEqual(0);
+expect(failureRuntime.getSnapshot().remainingThrows).toBe(before - 1);
+expect(failureRuntime.getSnapshot().failureReason).toBe('ground_hit');
 expect(failureRuntime.getSnapshot().resultOverlay.kind).toBe('failure');
 failureRuntime.tick(320);
 expect(failureRuntime.getSnapshot().resultOverlay.kind).toBe(null);
+```
+
+```ts
+const failStageRuntime = new StageRuntime(singleThrowStage);
+failStageRuntime.confirmAim();
+failStageRuntime.confirmPower();
+failStageRuntime.applyThrowResolution({ success: false, failureReason: 'ground_hit' });
+expect(failStageRuntime.getSnapshot().stageStatus).toBe('failed');
 ```
 
 - [ ] **Step 2: 테스트가 실패하는지 확인한다**
