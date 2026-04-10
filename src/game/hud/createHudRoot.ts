@@ -22,8 +22,13 @@ function mustQuery<T extends Element>(root: ParentNode, selector: string): T {
 }
 
 export function createHudRoot(doc: Document): HudRoot {
-  const root = doc.createElement('div');
-  root.id = 'hud-root';
+  let root = doc.getElementById('hud-root') as HTMLDivElement | null;
+  if (!root) {
+    root = doc.createElement('div');
+    root.id = 'hud-root';
+    doc.body.appendChild(root);
+  }
+
   root.innerHTML = `
     <div class="hud-top">
       <span data-role="stage"></span>
@@ -45,8 +50,6 @@ export function createHudRoot(doc: Document): HudRoot {
     </div>
     <div class="hud-result" data-role="result"></div>
   `;
-
-  doc.body.appendChild(root);
 
   return {
     element: root,

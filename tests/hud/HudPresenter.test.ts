@@ -56,4 +56,15 @@ describe('HudPresenter', () => {
 
     expect(root.resultBanner.textContent).toBe('Success');
   });
+
+  it('reuses the existing hud root instead of appending duplicates', () => {
+    document.body.innerHTML = '<div id="hud-root"></div>';
+
+    const existing = document.getElementById('hud-root');
+    const root = createHudRoot(document);
+
+    expect(root.element).toBe(existing);
+    expect(document.querySelectorAll('#hud-root')).toHaveLength(1);
+    expect(root.element.querySelector('[data-role="confirm-aim"]')).toBeInstanceOf(HTMLButtonElement);
+  });
 });

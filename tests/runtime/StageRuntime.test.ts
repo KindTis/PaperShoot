@@ -2,7 +2,70 @@ import { describe, expect, it } from 'vitest';
 import { StageRuntime } from '../../src/game/runtime/StageRuntime';
 import { stageCatalog } from '../../src/game/stages/stageCatalog';
 
+type MoveListener = (input: { normalizedX: number; normalizedY: number }) => void;
+type VoidListener = () => void;
+
+class PointerInputStub {
+  private moveListeners: MoveListener[] = [];
+  private clickListeners: VoidListener[] = [];
+
+  onMove(listener: MoveListener): void {
+    this.moveListeners.push(listener);
+  }
+
+  onLeftClick(listener: VoidListener): void {
+    this.clickListeners.push(listener);
+  }
+
+  move(input: { normalizedX: number; normalizedY: number }): void {
+    for (const listener of this.moveListeners) {
+      listener(input);
+    }
+  }
+
+  leftClick(): void {
+    for (const listener of this.clickListeners) {
+      listener();
+    }
+  }
+}
+
+class KeyboardStub {
+  private listeners = new Map<string, VoidListener[]>();
+
+  onKey(key: string, listener: VoidListener): void {
+    const current = this.listeners.get(key) ?? [];
+    current.push(listener);
+    this.listeners.set(key, current);
+  }
+
+  press(key: string): void {
+    const listeners = this.listeners.get(key) ?? [];
+    for (const listener of listeners) {
+      listener();
+    }
+  }
+}
+
 describe('StageRuntime', () => {
+  it('delegates pointer and keyboard input through the runtime boundary', () => {
+    const runtime = new StageRuntime(stageCatalog[0]);
+    const pointer = new PointerInputStub();
+    const keyboard = new KeyboardStub();
+
+    runtime.bindMouseHandlers(pointer);
+    runtime.bindKeyboardHandlers(keyboard);
+
+    pointer.move({ normalizedX: 1, normalizedY: 0 });
+    expect(runtime.getSnapshot().input.yawDeg).toBe(stageCatalog[0].aim.yawMaxDeg);
+
+    pointer.leftClick();
+    expect(runtime.getSnapshot().input.phase).toBe('power');
+
+    keyboard.press('Space');
+    expect(runtime.getSnapshot().input.phase).toBe('flying');
+  });
+
   it('keeps world time moving across retries and clears resolved UI state', () => {
     const runtime = new StageRuntime(stageCatalog[0]);
 

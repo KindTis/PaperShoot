@@ -89,6 +89,19 @@ export class StageRuntime {
     this.input.confirmAim();
   }
 
+  bindMouseHandlers(input: {
+    onMove: (listener: (input: { normalizedX: number; normalizedY: number }) => void) => void;
+    onLeftClick: (listener: () => void) => void;
+  }): void {
+    this.input.bindMouseHandlers(input);
+  }
+
+  bindKeyboardHandlers(keyboard: {
+    onKey: (key: string, listener: () => void) => void;
+  }): void {
+    this.input.bindKeyboardHandlers(keyboard);
+  }
+
   confirmPower(): void {
     const inputSnapshot = this.input.getSnapshot();
     if (inputSnapshot.phase !== 'power' || this.stageStatus !== 'playing') {

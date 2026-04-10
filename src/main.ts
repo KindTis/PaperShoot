@@ -1,4 +1,6 @@
 import './app/style.css';
-import { ensureHudRoot } from './app/createGameApp';
+import { createGameApp } from './app/createGameApp';
 
-ensureHudRoot(document);
+void createGameApp(document).catch((error: unknown) => {
+  console.error('Failed to boot PaperShoot', error);
+});
