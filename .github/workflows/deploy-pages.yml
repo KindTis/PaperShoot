@@ -4,25 +4,24 @@ on:
   push:
     branches:
       - main
-      - feat/papershoot-mvp
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
-  group: github-pages-branch
+  group: github-pages
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -36,34 +35,22 @@ jobs:
       - name: Build site
         run: npm run build
 
-      - name: Publish dist to gh-pages
-        shell: bash
-        run: |
-          set -euo pipefail
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
 
-          WORKTREE_DIR="$(mktemp -d)"
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
-          if git ls-remote --exit-code origin gh-pages >/dev/null 2>&1; then
-            git fetch origin gh-pages
-            git worktree add "$WORKTREE_DIR" origin/gh-pages
-          else
-            git worktree add -b gh-pages "$WORKTREE_DIR"
-          fi
-
-          find "$WORKTREE_DIR" -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
-          cp -R dist/. "$WORKTREE_DIR"/
-          touch "$WORKTREE_DIR/.nojekyll"
-
-          cd "$WORKTREE_DIR"
-          git add --all
-
-          if git diff --cached --quiet; then
-            echo "No gh-pages changes to publish."
-            exit 0
-          fi
-
-          git commit -m "deploy: update GitHub Pages"
-          git push origin HEAD:gh-pages
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
