@@ -10,6 +10,7 @@ type ScreenPoint = {
   x: number;
   y: number;
   scale: number;
+  depthClamped: boolean;
 };
 
 export class StageRenderer {
@@ -66,6 +67,9 @@ export class StageRenderer {
       y: this.stage.fan.position.y,
       z: this.stage.fan.position.z + this.stage.fan.influenceLength,
     });
+    if (fanOriginProjected.depthClamped || fanEndProjected.depthClamped) {
+      return;
+    }
     const fanOrigin = {
       x: layout.fanAnchor.x,
       y: layout.fanAnchor.y,
@@ -93,6 +97,9 @@ export class StageRenderer {
   private drawBin(): void {
     const layout = this.getLayout();
     const projected = this.toScreen(this.stage.bin.position);
+    if (projected.depthClamped) {
+      return;
+    }
     const binCenter = { x: layout.binAnchor.x, y: layout.binAnchor.y, scale: projected.scale };
     const collisionWidth = Math.max(68, this.stage.bin.openingWidth * 260 * projected.scale);
     const visualWidth = collisionWidth * 1.08;
@@ -137,6 +144,9 @@ export class StageRenderer {
         worldTimeMs,
       });
       const screen = this.toScreen(pose);
+      if (screen.depthClamped) {
+        continue;
+      }
       const obstacleWidth = Math.max(24, obstacle.size.x * 140 * screen.scale);
       const obstacleHeight = Math.max(18, obstacle.size.y * 120 * screen.scale);
       this.graphics.fillRoundedRect(
@@ -151,12 +161,18 @@ export class StageRenderer {
 
   private drawSpawnMarker(): void {
     const spawn = this.toScreen(this.stage.paper.spawn);
+    if (spawn.depthClamped) {
+      return;
+    }
     this.graphics.lineStyle(2, 0x6e6254, 0.75);
     this.graphics.strokeCircle(spawn.x, spawn.y, Math.max(8, this.stage.paper.radius * 90));
   }
 
   private drawAimGuide(snapshot: RuntimeSnapshot): void {
     const start = this.toScreen(this.stage.paper.spawn);
+    if (start.depthClamped) {
+      return;
+    }
     const yawRatio = Phaser.Math.Clamp(
       (snapshot.input.yawDeg - this.stage.aim.yawMinDeg) /
         (this.stage.aim.yawMaxDeg - this.stage.aim.yawMinDeg),
@@ -185,6 +201,9 @@ export class StageRenderer {
     const activeBody = snapshot.activeBody;
     const position = activeBody?.position ?? this.stage.paper.spawn;
     const projected = this.toScreen(position);
+    if (projected.depthClamped) {
+      return;
+    }
     const radius = Math.max(12, this.stage.paper.radius * 150 * projected.scale * 1.08);
 
     this.graphics.fillStyle(activeBody ? 0xfaf8f2 : 0xfaf8f2, activeBody ? 1 : 0.45);
@@ -205,6 +224,7 @@ export class StageRenderer {
       x: projected.x + offsetX,
       y: projected.y + offsetY,
       scale: projected.scale,
+      depthClamped: projected.depthClamped,
     };
   }
 

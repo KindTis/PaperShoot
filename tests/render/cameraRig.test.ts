@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { describe, expect, it, vi } from 'vitest';
 import { projectDeskPoint } from '../../src/game/render/cameraRig';
+import { stage01 } from '../../src/game/stages/stage01';
+import type { RuntimeSnapshot } from '../../src/game/runtime/runtimeTypes';
 
 describe('projectDeskPoint', () => {
   it('projects far points higher and smaller than near points', () => {
@@ -37,12 +37,64 @@ describe('projectDeskPoint', () => {
     expect(projected.y).toBeCloseTo(viewport.height * 0.88, 6);
   });
 
-  it('is wired into StageRenderer render path', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/game/render/StageRenderer.ts'), 'utf-8');
+  it('suppresses behind-camera paper rendering through StageRenderer path', async () => {
+    vi.resetModules();
+    vi.doMock('phaser', () => ({
+      default: {
+        Math: {
+          Clamp: (value: number, min: number, max: number) => Math.min(max, Math.max(min, value)),
+        },
+      },
+    }));
+    const { StageRenderer } = await import('../../src/game/render/StageRenderer');
 
-    expect(source).toContain("from './cameraRig'");
-    expect(source).toContain('projectDeskPoint(');
-    expect(source).toContain("from './deskLayout'");
-    expect(source).toContain('createDeskLayout(');
+    const graphics = {
+      setDepth: vi.fn(),
+      clear: vi.fn(),
+      fillStyle: vi.fn(),
+      fillRect: vi.fn(),
+      fillRoundedRect: vi.fn(),
+      lineStyle: vi.fn(),
+      strokeRoundedRect: vi.fn(),
+      strokeCircle: vi.fn(),
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      strokePath: vi.fn(),
+      fillCircle: vi.fn(),
+    };
+    const scene = {
+      add: { graphics: () => graphics },
+      scale: { width: 1280, height: 720 },
+      cameras: { main: { setBackgroundColor: vi.fn() } },
+    };
+    const stage = {
+      ...stage01,
+      fan: { ...stage01.fan, enabled: false },
+      paper: { ...stage01.paper, spawn: { ...stage01.paper.spawn, z: -0.2 } },
+    };
+    const snapshot: RuntimeSnapshot = {
+      worldTimeMs: 0,
+      throwIndex: 0,
+      remainingThrows: stage.clear.throwLimit,
+      successCount: 0,
+      stageStatus: 'playing',
+      resultOverlay: { kind: null, text: '' },
+      failureReason: null,
+      input: {
+        phase: 'aim',
+        yawDeg: stage.aim.defaultYawDeg,
+        pitchDeg: stage.aim.defaultPitchDeg,
+        power: stage.power.startPower,
+      },
+      activeBody: null,
+    };
+    const renderer = new StageRenderer(scene as never, stage);
+
+    renderer.render(snapshot);
+
+    expect(graphics.strokeCircle).not.toHaveBeenCalled();
+    const largeFillCircleCalls = graphics.fillCircle.mock.calls.filter((call) => call[2] >= 10);
+    expect(largeFillCircleCalls).toHaveLength(0);
   });
 });
