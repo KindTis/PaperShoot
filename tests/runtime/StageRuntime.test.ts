@@ -47,6 +47,12 @@ class KeyboardStub {
   }
 }
 
+function tickRuntime(runtime: StageRuntime, frames: number, deltaMs = 1000 / 60): void {
+  for (let index = 0; index < frames; index += 1) {
+    runtime.tick(deltaMs);
+  }
+}
+
 describe('StageRuntime', () => {
   it('delegates pointer and keyboard input through the runtime boundary', () => {
     const runtime = new StageRuntime(stageCatalog[0]);
@@ -120,6 +126,74 @@ describe('StageRuntime', () => {
 
     runtime.tick(320);
     expect(runtime.getSnapshot().resultOverlay.kind).toBe(null);
+  });
+
+  it('latches a success when the throw enters the bin volume', () => {
+    const successStage = {
+      ...stageCatalog[0],
+      id: 'stage-success',
+      fan: {
+        ...stageCatalog[0].fan,
+        enabled: false,
+        targetLateralSpeed: 0,
+        strength: 0,
+      },
+      physics: {
+        ...stageCatalog[0].physics,
+        gravityY: -12,
+        maxFlightTimeMs: 2500,
+      },
+      bin: {
+        ...stageCatalog[0].bin,
+        position: { x: 0, y: 2.1, z: 2.8 },
+        openingWidth: 6,
+        openingHeight: 6,
+        innerDepth: 2,
+        depthTolerance: 0.05,
+        entrySpeedMin: 0,
+        entrySpeedMax: 20,
+        settleTimeMs: 0,
+      },
+    };
+
+    const runtime = new StageRuntime(successStage);
+    runtime.confirmAim();
+    runtime.confirmPower();
+    tickRuntime(runtime, 20);
+
+    expect(runtime.getSnapshot().successCount).toBe(1);
+    expect(runtime.getSnapshot().stageStatus).toBe('cleared');
+  });
+
+  it('fails with a ground hit when the throw lands before success', () => {
+    const groundStage = {
+      ...stageCatalog[0],
+      id: 'stage-ground-fail',
+      clear: { throwLimit: 1, requiredSuccesses: 1 },
+      fan: {
+        ...stageCatalog[0].fan,
+        enabled: false,
+        targetLateralSpeed: 0,
+        strength: 0,
+      },
+      physics: {
+        ...stageCatalog[0].physics,
+        gravityY: -24,
+        maxFlightTimeMs: 4000,
+      },
+      bin: {
+        ...stageCatalog[0].bin,
+        position: { x: 6, y: 1.1, z: 14 },
+      },
+    };
+
+    const runtime = new StageRuntime(groundStage);
+    runtime.confirmAim();
+    runtime.confirmPower();
+    tickRuntime(runtime, 180);
+
+    expect(runtime.getSnapshot().stageStatus).toBe('failed');
+    expect(runtime.getSnapshot().failureReason).toBe('ground_hit');
   });
 
   it('emits stage_failed after the final miss', () => {

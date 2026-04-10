@@ -7,6 +7,7 @@ export interface ThrowBody {
   velocity: Vec3;
   elapsedMs: number;
   binState: BinState;
+  insideBinMs: number;
 }
 
 export interface ResultOverlay {

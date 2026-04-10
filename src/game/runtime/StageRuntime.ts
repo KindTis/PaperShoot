@@ -1,14 +1,36 @@
+import { updateBinState } from '../collision/binStateMachine';
+import { selectFailureReason } from '../scoring/selectFailureReason';
 import type { FailureReason, StageConfig, Vec3 } from '../contracts';
 import { ThrowInputController } from '../input/ThrowInputController';
+import { getObstacleWorldPose } from '../obstacles/getObstacleWorldPose';
 import { advanceThrowStep } from '../simulation/advanceThrowStep';
 import { applyWindZone } from '../simulation/applyWindZone';
 import { createLaunchVector } from '../simulation/createLaunchVector';
 import type { ResultOverlay, RuntimeSnapshot, ShellEvent, ThrowBody } from './runtimeTypes';
 
 const OVERLAY_DURATION_MS = 300;
+const LATERAL_BOUNDS_X = 6;
+const FAR_BOUNDS_Z = 18;
 
 function cloneVec3(vec: Vec3): Vec3 {
   return { x: vec.x, y: vec.y, z: vec.z };
+}
+
+function magnitude(vec: Vec3): number {
+  return Math.hypot(vec.x, vec.y, vec.z);
+}
+
+function overlapsObstacle(position: Vec3, radius: number, center: Vec3, size: Vec3): boolean {
+  const halfX = size.x * 0.5;
+  const halfY = size.y * 0.5;
+  const halfZ = size.z * 0.5;
+  const closestX = Math.max(center.x - halfX, Math.min(position.x, center.x + halfX));
+  const closestY = Math.max(center.y - halfY, Math.min(position.y, center.y + halfY));
+  const closestZ = Math.max(center.z - halfZ, Math.min(position.z, center.z + halfZ));
+  const dx = position.x - closestX;
+  const dy = position.y - closestY;
+  const dz = position.z - closestZ;
+  return dx * dx + dy * dy + dz * dz <= radius * radius;
 }
 
 export class StageRuntime {
@@ -43,6 +65,7 @@ export class StageRuntime {
         bodyPosition: this.activeBody.position,
         fan: this.stage.fan,
       });
+      const previousPosition = cloneVec3(this.activeBody.position);
       const stepped = advanceThrowStep({
         velocity: this.activeBody.velocity,
         dtSec,
@@ -54,7 +77,7 @@ export class StageRuntime {
         maxFallSpeed: this.stage.physics.maxFallSpeed,
       });
 
-      this.activeBody = {
+      const nextBody: ThrowBody = {
         ...this.activeBody,
         velocity: stepped.velocity,
         position: {
@@ -65,7 +88,14 @@ export class StageRuntime {
         elapsedMs: this.activeBody.elapsedMs + deltaMs,
       };
 
-      if (this.activeBody.elapsedMs >= this.stage.physics.maxFlightTimeMs && this.stageStatus === 'playing') {
+      this.activeBody = nextBody;
+      this.evaluateThrowState(previousPosition, deltaMs);
+
+      if (
+        this.activeBody &&
+        this.activeBody.elapsedMs >= this.stage.physics.maxFlightTimeMs &&
+        this.stageStatus === 'playing'
+      ) {
         this.applyThrowResolution({ success: false, failureReason: 'time_expired' });
       }
     }
@@ -123,6 +153,7 @@ export class StageRuntime {
       velocity: launchVector,
       elapsedMs: 0,
       binState: 'Outside',
+      insideBinMs: 0,
     };
   }
 
@@ -183,5 +214,133 @@ export class StageRuntime {
       input: this.input.getSnapshot(),
       activeBody: this.activeBody,
     };
+  }
+
+  private evaluateThrowState(previousPosition: Vec3, deltaMs: number): void {
+    if (!this.activeBody || this.stageStatus !== 'playing') {
+      return;
+    }
+
+    const currentBody = this.activeBody;
+    const currentPosition = currentBody.position;
+    const speed = magnitude(currentBody.velocity);
+    const verticalOffset = Math.abs(currentPosition.y - this.stage.bin.position.y);
+    const horizontalOffset = Math.abs(currentPosition.x - this.stage.bin.position.x);
+    const withinOpeningHeight = verticalOffset <= this.stage.bin.openingHeight * 0.5;
+    const crossedOpeningPlaneDownward =
+      previousPosition.z < this.stage.bin.position.z && currentPosition.z >= this.stage.bin.position.z;
+    const enteredInnerVolume =
+      currentPosition.z >= this.stage.bin.position.z &&
+      currentPosition.z <= this.stage.bin.position.z + this.stage.bin.innerDepth &&
+      horizontalOffset <= this.stage.bin.openingWidth * 0.5 &&
+      withinOpeningHeight;
+    const insideBinMs = enteredInnerVolume ? currentBody.insideBinMs + deltaMs : 0;
+
+    const binResult = updateBinState({
+      currentState: currentBody.binState,
+      crossedOpeningPlaneDownward: crossedOpeningPlaneDownward && withinOpeningHeight,
+      horizontalOffset,
+      openingWidth: this.stage.bin.openingWidth,
+      speed,
+      entrySpeedMin: this.stage.bin.entrySpeedMin,
+      entrySpeedMax: this.stage.bin.entrySpeedMax,
+      desiredInwardOffset: Math.max(0, horizontalOffset - this.stage.bin.openingWidth * 0.5),
+      entryAssistRadius: this.stage.bin.entryAssistRadius,
+      enteredInnerVolume,
+      insideTimeMs: insideBinMs,
+      settleTimeMs: this.stage.bin.settleTimeMs,
+      depthBelowOpening: Math.max(0, currentPosition.z - this.stage.bin.position.z),
+      depthTolerance: this.stage.bin.depthTolerance,
+      insideFloor: enteredInnerVolume && currentPosition.y <= this.stage.paper.radius,
+    });
+
+    this.activeBody = {
+      ...currentBody,
+      binState: binResult.state,
+      insideBinMs,
+    };
+
+    if (binResult.state === 'SuccessLatched') {
+      this.applyThrowResolution({ success: true, failureReason: null });
+      return;
+    }
+
+    if (this.hitObstacle(currentPosition)) {
+      this.applyThrowResolution({
+        success: false,
+        failureReason: selectFailureReason({
+          rimRejected: false,
+          hitObstacle: true,
+          leftByWind: false,
+          launchWasTooWeak: false,
+          launchWasTooStrong: false,
+          hitGround: false,
+        }),
+      });
+      return;
+    }
+
+    if (crossedOpeningPlaneDownward && (!withinOpeningHeight || binResult.state === 'RimContact')) {
+      this.applyThrowResolution({
+        success: false,
+        failureReason: selectFailureReason({
+          rimRejected: withinOpeningHeight,
+          hitObstacle: false,
+          leftByWind: false,
+          launchWasTooWeak: speed < this.stage.bin.entrySpeedMin,
+          launchWasTooStrong: speed > this.stage.bin.entrySpeedMax,
+          hitGround: false,
+        }),
+      });
+      return;
+    }
+
+    if (!binResult.suppressWorldFloorFailure && currentPosition.y <= this.stage.paper.radius) {
+      this.applyThrowResolution({
+        success: false,
+        failureReason: selectFailureReason({
+          rimRejected: false,
+          hitObstacle: false,
+          leftByWind: false,
+          launchWasTooWeak: false,
+          launchWasTooStrong: false,
+          hitGround: true,
+        }),
+      });
+      return;
+    }
+
+    if (Math.abs(currentPosition.x) > LATERAL_BOUNDS_X) {
+      this.applyThrowResolution({
+        success: false,
+        failureReason: selectFailureReason({
+          rimRejected: false,
+          hitObstacle: false,
+          leftByWind: this.stage.fan.enabled,
+          launchWasTooWeak: false,
+          launchWasTooStrong: false,
+          hitGround: false,
+        }) ?? 'out_of_bounds',
+      });
+      return;
+    }
+
+    if (currentPosition.z > FAR_BOUNDS_Z) {
+      this.applyThrowResolution({
+        success: false,
+        failureReason: this.stage.fan.enabled ? 'wind_push' : 'out_of_bounds',
+      });
+    }
+  }
+
+  private hitObstacle(position: Vec3): boolean {
+    return this.stage.obstacles.some((obstacle) => {
+      const obstaclePosition = getObstacleWorldPose({
+        basePosition: obstacle.position,
+        motion: obstacle.motion,
+        worldTimeMs: this.worldTimeMs,
+      });
+      return overlapsObstacle(position, this.stage.paper.radius, obstaclePosition, obstacle.size);
+    });
   }
 }
