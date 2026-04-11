@@ -3,3 +3,8 @@
 node_modules/
 dist/
 *.tsbuildinfo
+.codex/
+AGENTS.md
+graphify-out/
+output/
+test-results/
