@@ -226,4 +226,32 @@ describe('StageRuntime', () => {
       stageId: singleThrowStage.id,
     });
   });
+
+  it('restarts a failed stage back to its initial shell state', () => {
+    const singleThrowStage = {
+      ...stageCatalog[0],
+      id: 'stage-01-restart',
+      clear: { throwLimit: 1, requiredSuccesses: 1 },
+    };
+
+    const runtime = new StageRuntime(singleThrowStage);
+
+    runtime.confirmAim();
+    runtime.confirmPower();
+    runtime.applyThrowResolution({ success: false, failureReason: 'ground_hit' });
+
+    expect(runtime.getSnapshot().stageStatus).toBe('failed');
+
+    (runtime as StageRuntime & { restartStage: () => void }).restartStage();
+
+    const snapshot = runtime.getSnapshot();
+    expect(snapshot.throwIndex).toBe(0);
+    expect(snapshot.remainingThrows).toBe(singleThrowStage.clear.throwLimit);
+    expect(snapshot.successCount).toBe(0);
+    expect(snapshot.stageStatus).toBe('playing');
+    expect(snapshot.failureReason).toBeNull();
+    expect(snapshot.resultOverlay).toEqual({ kind: null, text: '' });
+    expect(snapshot.activeBody).toBeNull();
+    expect(runtime.consumeShellEvent()).toBeNull();
+  });
 });

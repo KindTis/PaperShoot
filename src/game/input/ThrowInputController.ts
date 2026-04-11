@@ -90,6 +90,12 @@ export class ThrowInputController {
     this.powerDirection = 1;
   }
 
+  resetForStageRestart(): void {
+    this.resetForRetry();
+    this.yawDeg = this.config.aim.defaultYawDeg;
+    this.pitchDeg = this.config.aim.defaultPitchDeg;
+  }
+
   getSnapshot(): ThrowInputSnapshot {
     return {
       phase: this.phase,

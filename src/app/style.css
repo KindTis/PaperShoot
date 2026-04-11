@@ -88,7 +88,38 @@ body {
   box-shadow: 0 16px 28px rgba(43, 26, 14, 0.22);
 }
 
+.hud-bottom[hidden] {
+  display: none;
+}
+
 .hud-actions {
+  position: absolute;
+  top: max(126px, calc(env(safe-area-inset-top) + 108px));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.hud-actions[hidden] {
+  display: none;
+}
+
+.hud-actions button {
+  min-width: 120px;
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #c86a2b;
+  color: #fff7ef;
+  font: inherit;
+  font-weight: 700;
+  box-shadow: 0 14px 28px rgba(87, 47, 21, 0.26);
+  cursor: pointer;
+}
+
+.hud-actions button[hidden] {
   display: none;
 }
 
@@ -107,6 +138,10 @@ body {
 }
 
 .hud-result:empty {
+  display: none;
+}
+
+.hud-result[hidden] {
   display: none;
 }
 

@@ -222,6 +222,21 @@ export class StageRuntime {
     this.input.resetForRetry();
   }
 
+  restartStage(): void {
+    this.worldTimeMs = 0;
+    this.throwIndex = 0;
+    this.remainingThrows = this.stage.clear.throwLimit;
+    this.successCount = 0;
+    this.stageStatus = 'playing';
+    this.resultOverlay = { kind: null, text: '' };
+    this.failureReason = null;
+    this.activeBody = null;
+    this.overlayRemainingMs = 0;
+    this.pendingShellEvent = null;
+    this.emitClearEventAfterOverlay = false;
+    this.input.resetForStageRestart();
+  }
+
   consumeShellEvent(): ShellEvent | null {
     const event = this.pendingShellEvent;
     this.pendingShellEvent = null;

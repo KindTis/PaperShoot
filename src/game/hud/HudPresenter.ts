@@ -9,6 +9,8 @@ export interface HudViewModel {
   powerText: string;
   failureReasonText: string;
   resultBannerText: string;
+  primaryActionText?: string;
+  primaryActionVisible?: boolean;
 }
 
 export class HudPresenter {
@@ -27,6 +29,11 @@ export class HudPresenter {
     this.root.powerValue.textContent = view.powerText;
     this.root.failureReason.textContent = view.failureReasonText;
     this.root.resultBanner.textContent = view.resultBannerText;
+    this.root.confirmAimButton.hidden = true;
+    this.root.confirmPowerButton.hidden = true;
+    this.root.retryButton.textContent = view.primaryActionText?.trim() || 'Retry';
+    this.root.retryButton.hidden = !view.primaryActionVisible;
+    this.root.actionGroup.hidden = !view.primaryActionVisible;
     this.root.debugStrip.hidden =
       view.aimText.trim().length === 0 &&
       view.powerText.trim().length === 0 &&

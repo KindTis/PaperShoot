@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createHudRoot } from '../../src/game/hud/createHudRoot';
 import { HudPresenter } from '../../src/game/hud/HudPresenter';
+import type { HudViewModel } from '../../src/game/hud/HudPresenter';
 
 describe('HudPresenter commercial mode', () => {
   it('creates a hidden debug strip and renders only compact stage data by default', () => {
@@ -27,5 +28,26 @@ describe('HudPresenter commercial mode', () => {
     expect(root.powerValue.textContent).toBe('');
     expect(root.failureReason.textContent).toBe('');
     expect(root.resultBanner.textContent).toContain('약한 바람');
+  });
+
+  it('shows a retry action when the result banner enters a game over state', () => {
+    const root = createHudRoot(document);
+    const presenter = new HudPresenter(root);
+
+    presenter.render({
+      stageLabel: 'Stage 1',
+      throwText: '0 throws left',
+      successText: '0 / 1',
+      windText: '→ weak 1.2',
+      aimText: '',
+      powerText: '',
+      failureReasonText: 'ground_hit',
+      resultBannerText: 'Game Over',
+      primaryActionText: 'Retry',
+      primaryActionVisible: true,
+    } as HudViewModel & { primaryActionText: string; primaryActionVisible: boolean });
+
+    expect(root.resultBanner.textContent).toBe('Game Over');
+    expect(root.retryButton.parentElement?.hidden).toBe(false);
   });
 });
