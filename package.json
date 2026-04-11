@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "test": "vitest run"
+    "preview": "vite preview --host 127.0.0.1 --port 4174 --base /PaperShoot/",
+    "test": "vitest run",
+    "test:e2e:stages": "playwright test tests/e2e/stage-direct-entry.spec.ts"
   },
   "keywords": [],
   "author": "",
@@ -15,6 +17,7 @@
     "phaser": "^3.90.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/node": "^25.5.2",
     "jsdom": "^29.0.2",
     "typescript": "^6.0.2",

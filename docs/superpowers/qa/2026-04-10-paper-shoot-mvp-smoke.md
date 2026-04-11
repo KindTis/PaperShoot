@@ -54,3 +54,31 @@
 - This smoke pass verified boot, HUD placement, and drag-release interaction on desktop and mobile-sized viewports.
 - Screenshot artifacts were captured for human visual review of paper/bin/fan composition and perceived depth.
 - Final commercial art sign-off still benefits from a human eyeball pass, but no blocking implementation issue appeared in this smoke run.
+
+---
+
+## 2026-04-11 Direct-Entry Smoke (Stage 1~6)
+
+- Date: 2026-04-11
+- Command: `npm exec playwright test tests/e2e/stage-direct-entry.spec.ts`
+- Result: `7 passed (1.0m)`
+- Base URL: `http://127.0.0.1:4174/PaperShoot/`
+- Stage URL pattern: `http://127.0.0.1:4174/PaperShoot/?stage={N}`
+
+### Stage Matrix
+
+| Stage | URL | Expected stageId | Expected obstacle ids | Screenshot |
+| --- | --- | --- | --- | --- |
+| 1 | `http://127.0.0.1:4174/PaperShoot/?stage=1` | `stage-01` | `''` | `output/playwright/stage-01-direct-entry.png` |
+| 2 | `http://127.0.0.1:4174/PaperShoot/?stage=2` | `stage-02` | `''` | `output/playwright/stage-02-direct-entry.png` |
+| 3 | `http://127.0.0.1:4174/PaperShoot/?stage=3` | `stage-03` | `block-center` | `output/playwright/stage-03-direct-entry.png` |
+| 4 | `http://127.0.0.1:4174/PaperShoot/?stage=4` | `stage-04` | `block-left,block-right` | `output/playwright/stage-04-direct-entry.png` |
+| 5 | `http://127.0.0.1:4174/PaperShoot/?stage=5` | `stage-05` | `moving-slab` | `output/playwright/stage-05-direct-entry.png` |
+| 6 | `http://127.0.0.1:4174/PaperShoot/?stage=6` | `stage-06` | `moving-panel,gate-final` | `output/playwright/stage-06-direct-entry.png` |
+
+### Regression Check
+
+- Stage 1 representative regression:
+  - 3회 투척 소진 -> `Game Over` 배너 및 `Retry` 버튼 표시 확인
+  - `Retry` 클릭 후 `3 throws left`로 리셋 확인
+  - Evidence: `output/playwright/stage-01-game-over-retry.png`
