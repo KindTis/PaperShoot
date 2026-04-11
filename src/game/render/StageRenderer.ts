@@ -7,6 +7,12 @@ import { createLaunchVector } from '../simulation/createLaunchVector';
 import { projectDeskPoint } from './cameraRig';
 import { createDeskLayout } from './deskLayout';
 import type { RenderViewport } from './renderTheme';
+import {
+  createBinEntryWindowRect,
+  createBinSpriteLayout,
+  createObstacleSpriteLayout,
+  resolveObstacleAssetKey,
+} from './stageSpriteLayout';
 
 type ScreenPoint = {
   x: number;
@@ -21,12 +27,83 @@ type RenderSprites = {
   fan: Phaser.GameObjects.Image | null;
   cup: Phaser.GameObjects.Image | null;
   pencilCup: Phaser.GameObjects.Image | null;
+  officeBackdrop: {
+    backplate: Phaser.GameObjects.Image | null;
+    midgroundDeskCluster: Phaser.GameObjects.Image | null;
+    sideCubicleLeft: Phaser.GameObjects.Image | null;
+    sideCubicleRight: Phaser.GameObjects.Image | null;
+    foregroundDeskEdge: Phaser.GameObjects.Image | null;
+  };
+  obstacles: Array<{
+    id: string;
+    sprite: Phaser.GameObjects.Image | null;
+  }>;
 };
 
 const PROP_POSITIONS = {
   cup: { x: -1.65, y: 1.05, z: 4.8 },
   pencilCup: { x: 2.15, y: 1.08, z: 5.7 },
 } as const;
+
+const OFFICE_BACKDROP_LAYOUT = [
+  {
+    key: 'backplate',
+    xRatio: 0.5,
+    yRatio: 0.5,
+    widthRatio: 1.04,
+    heightRatio: 1.02,
+    originX: 0.5,
+    originY: 0.5,
+    alpha: 1,
+  },
+  {
+    key: 'midgroundDeskCluster',
+    xRatio: 0.5,
+    yRatio: 0.54,
+    widthRatio: 0.94,
+    heightRatio: 0.44,
+    originX: 0.5,
+    originY: 0.5,
+    alpha: 0.98,
+  },
+  {
+    key: 'sideCubicleLeft',
+    xRatio: 0.12,
+    yRatio: 0.44,
+    widthRatio: 0.26,
+    heightRatio: 0.62,
+    originX: 0.5,
+    originY: 0.5,
+    alpha: 1,
+  },
+  {
+    key: 'sideCubicleRight',
+    xRatio: 0.88,
+    yRatio: 0.45,
+    widthRatio: 0.26,
+    heightRatio: 0.62,
+    originX: 0.5,
+    originY: 0.5,
+    alpha: 1,
+  },
+  {
+    key: 'foregroundDeskEdge',
+    xRatio: 0.5,
+    yRatio: 0.86,
+    widthRatio: 1.06,
+    heightRatio: 0.34,
+    originX: 0.5,
+    originY: 0.5,
+    alpha: 1,
+  },
+] as const;
+
+type BackdropPalette = {
+  background: string;
+  wall: number;
+  trim: number;
+  floor: number;
+};
 
 export class StageRenderer {
   private readonly scene: Phaser.Scene;
@@ -47,10 +124,10 @@ export class StageRenderer {
     this.lastSnapshot = snapshot;
     this.resetSprites();
 
-    this.scene.cameras.main.setBackgroundColor('#e8dccd');
+    this.scene.cameras.main.setBackgroundColor(this.getBackdropPalette().background);
     this.graphics.clear();
 
-    this.drawDeskBackdrop();
+    this.drawBackdrop();
     this.drawProps();
     this.drawFan(snapshot.worldTimeMs);
     this.drawBin();
@@ -76,6 +153,17 @@ export class StageRenderer {
         fan: null,
         cup: null,
         pencilCup: null,
+        officeBackdrop: {
+          backplate: null,
+          midgroundDeskCluster: null,
+          sideCubicleLeft: null,
+          sideCubicleRight: null,
+          foregroundDeskEdge: null,
+        },
+        obstacles: this.stage.obstacles.map((obstacle) => ({
+          id: obstacle.id,
+          sprite: null,
+        })),
       };
     }
 
@@ -96,25 +184,55 @@ export class StageRenderer {
       fan: create(assetManifest.fan.main.key, 4),
       cup: create(assetManifest.props.cup.key, 4),
       pencilCup: create(assetManifest.props.pencilCup.key, 4),
+      officeBackdrop: {
+        backplate: this.stage.theme === 'office' ? create(assetManifest.background.backplate.key, 0) : null,
+        midgroundDeskCluster: this.stage.theme === 'office' ? create(assetManifest.background.midgroundDeskCluster.key, 1) : null,
+        sideCubicleLeft: this.stage.theme === 'office' ? create(assetManifest.background.sideCubicleLeft.key, 2) : null,
+        sideCubicleRight: this.stage.theme === 'office' ? create(assetManifest.background.sideCubicleRight.key, 2) : null,
+        foregroundDeskEdge: this.stage.theme === 'office' ? create(assetManifest.background.foregroundDeskEdge.key, 3) : null,
+      },
+      obstacles: this.stage.obstacles.map((obstacle) => {
+        const obstacleAssetKey = resolveObstacleAssetKey(obstacle.id);
+        return {
+          id: obstacle.id,
+          sprite: obstacleAssetKey ? create(obstacleAssetKey, 6) : null,
+        };
+      }),
     };
   }
 
   private resetSprites(): void {
-    for (const sprite of Object.values(this.sprites)) {
+    const commonSprites = [
+      this.sprites.paper,
+      this.sprites.bin,
+      this.sprites.fan,
+      this.sprites.cup,
+      this.sprites.pencilCup,
+      this.sprites.officeBackdrop.backplate,
+      this.sprites.officeBackdrop.midgroundDeskCluster,
+      this.sprites.officeBackdrop.sideCubicleLeft,
+      this.sprites.officeBackdrop.sideCubicleRight,
+      this.sprites.officeBackdrop.foregroundDeskEdge,
+    ];
+    for (const sprite of commonSprites) {
       sprite?.setVisible(false);
+    }
+    for (const obstacleSprite of this.sprites.obstacles) {
+      obstacleSprite.sprite?.setVisible(false);
     }
   }
 
   private drawDeskBackdrop(): void {
+    const palette = this.getBackdropPalette();
     const width = this.scene.scale.width;
     const height = this.scene.scale.height;
     const horizonY = height * 0.45;
     const deskTopY = height * 0.48;
 
-    this.graphics.fillStyle(0xf4ede1, 1);
+    this.graphics.fillStyle(palette.wall, 1);
     this.graphics.fillRect(0, 0, width, horizonY);
 
-    this.graphics.fillStyle(0xe4d2bb, 1);
+    this.graphics.fillStyle(palette.trim, 1);
     this.graphics.fillRect(0, horizonY - 32, width, 40);
 
     const graphicsWithPolygon = this.graphics as Phaser.GameObjects.Graphics & {
@@ -123,7 +241,7 @@ export class StageRenderer {
     };
 
     if (typeof graphicsWithPolygon.closePath === 'function' && typeof graphicsWithPolygon.fillPath === 'function') {
-      this.graphics.fillStyle(0xc9a578, 1);
+      this.graphics.fillStyle(palette.floor, 1);
       this.graphics.beginPath();
       this.graphics.moveTo(width * 0.06, height);
       this.graphics.lineTo(width * 0.94, height);
@@ -132,7 +250,7 @@ export class StageRenderer {
       graphicsWithPolygon.closePath();
       graphicsWithPolygon.fillPath();
     } else {
-      this.graphics.fillStyle(0xc9a578, 1);
+      this.graphics.fillStyle(palette.floor, 1);
       this.graphics.fillRoundedRect(width * 0.08, deskTopY, width * 0.84, height - deskTopY + 40, 28);
     }
 
@@ -147,7 +265,54 @@ export class StageRenderer {
     }
   }
 
+  private drawBackdrop(): void {
+    if (this.stage.theme === 'office') {
+      if (!this.drawOfficeBackdropSprites()) {
+        this.drawOfficeBackdrop();
+      }
+      return;
+    }
+
+    this.drawDeskBackdrop();
+  }
+
+  private drawOfficeBackdropSprites(): boolean {
+    const layers = this.sprites.officeBackdrop;
+    if (!layers.backplate || !layers.midgroundDeskCluster || !layers.sideCubicleLeft || !layers.sideCubicleRight || !layers.foregroundDeskEdge) {
+      return false;
+    }
+
+    const layerSprites = {
+      backplate: layers.backplate,
+      midgroundDeskCluster: layers.midgroundDeskCluster,
+      sideCubicleLeft: layers.sideCubicleLeft,
+      sideCubicleRight: layers.sideCubicleRight,
+      foregroundDeskEdge: layers.foregroundDeskEdge,
+    } as const;
+    const width = this.scene.scale.width;
+    const height = this.scene.scale.height;
+    for (const layer of OFFICE_BACKDROP_LAYOUT) {
+      const sprite = layerSprites[layer.key];
+      sprite.setOrigin(layer.originX, layer.originY);
+      this.syncSprite(
+        sprite,
+        width * layer.xRatio,
+        height * layer.yRatio,
+        width * layer.widthRatio,
+        height * layer.heightRatio,
+        0,
+        layer.alpha,
+      );
+    }
+    return true;
+  }
+
   private drawProps(): void {
+    if (this.stage.theme === 'office') {
+      this.drawOfficeProps();
+      return;
+    }
+
     this.drawPropSprite(this.sprites.cup, PROP_POSITIONS.cup, { width: 72, height: 72 }, 0.98);
     this.drawPropSprite(this.sprites.pencilCup, PROP_POSITIONS.pencilCup, { width: 86, height: 86 }, 0.98);
 
@@ -166,6 +331,50 @@ export class StageRenderer {
         this.graphics.fillRoundedRect(pencilCup.x - 20, pencilCup.y - 26, 40, 46, 10);
       }
     }
+  }
+
+  private drawOfficeBackdrop(): void {
+    const width = this.scene.scale.width;
+    const height = this.scene.scale.height;
+    const horizonY = height * 0.44;
+    const floorY = height * 0.58;
+
+    this.graphics.fillStyle(0xe6eaef, 1);
+    this.graphics.fillRect(0, 0, width, horizonY);
+
+    this.graphics.fillStyle(0xd4dae3, 1);
+    this.graphics.fillRect(0, horizonY - 18, width, 26);
+
+    this.graphics.fillStyle(0x6c86a0, 1);
+    this.graphics.fillRect(0, floorY, width, height - floorY);
+
+    this.graphics.fillStyle(0xa9b3bf, 1);
+    this.graphics.fillRoundedRect(width * 0.02, height * 0.16, width * 0.18, height * 0.46, 20);
+    this.graphics.fillRoundedRect(width * 0.8, height * 0.18, width * 0.18, height * 0.44, 20);
+
+    this.graphics.fillStyle(0x596571, 1);
+    this.graphics.fillRoundedRect(width * 0.1, height * 0.56, width * 0.18, height * 0.13, 12);
+    this.graphics.fillRoundedRect(width * 0.76, height * 0.58, width * 0.18, height * 0.12, 12);
+
+    this.graphics.fillStyle(0xf4fafc, 1);
+    this.graphics.fillRoundedRect(width * 0.12, height * 0.2, width * 0.17, height * 0.11, 12);
+
+    this.graphics.lineStyle(5, 0xd97125, 0.95);
+    this.graphics.strokeRoundedRect(width * 0.56, height * 0.58, width * 0.11, height * 0.08, 10);
+  }
+
+  private drawOfficeProps(): void {
+    const width = this.scene.scale.width;
+    const height = this.scene.scale.height;
+
+    this.graphics.fillStyle(0x55606d, 0.96);
+    this.graphics.fillRoundedRect(width * 0.78, height * 0.7, width * 0.08, height * 0.15, 12);
+    this.graphics.fillRoundedRect(width * 0.8, height * 0.61, width * 0.05, height * 0.06, 10);
+
+    this.graphics.fillStyle(0xcd7f3e, 0.94);
+    this.graphics.fillRoundedRect(width * 0.18, height * 0.66, width * 0.06, height * 0.08, 10);
+    this.graphics.fillStyle(0x4f8f4f, 0.96);
+    this.graphics.fillCircle(width * 0.21, height * 0.65, 18);
   }
 
   private drawPropSprite(
@@ -243,30 +452,41 @@ export class StageRenderer {
 
     const binX = layout.binAnchor.x;
     const binY = layout.binAnchor.y;
-    const collisionWidth = Math.max(86, this.stage.bin.openingWidth * 300 * projected.scale);
-    const visualWidth = collisionWidth * 1.08;
-    const visualHeight = Math.max(92, visualWidth * 1.22);
+    const binSpriteLayout = createBinSpriteLayout({
+      screenX: binX,
+      screenY: binY,
+      projectedScale: projected.scale,
+      openingWidth: this.stage.bin.openingWidth,
+    });
+    const visualWidth = binSpriteLayout.width;
+    const visualHeight = binSpriteLayout.height;
+    const entryWindowRect = createBinEntryWindowRect({
+      binLayout: binSpriteLayout,
+      minWidth: 86,
+      minHeight: 20,
+    });
 
     this.graphics.fillStyle(0x3b2b1f, 0.14);
-    this.graphics.fillRoundedRect(binX - visualWidth * 0.38, binY + visualHeight * 0.28, visualWidth * 0.76, 14, 7);
+    this.graphics.fillRoundedRect(binSpriteLayout.x - visualWidth * 0.38, binSpriteLayout.y + visualHeight * 0.06, visualWidth * 0.76, 14, 7);
 
     if (this.sprites.bin) {
-      this.syncSprite(this.sprites.bin, binX, binY + visualHeight * 0.12, visualWidth * 1.24, visualHeight * 1.42, 0, 1);
+      this.sprites.bin.setOrigin(binSpriteLayout.originX, binSpriteLayout.originY);
+      this.syncSprite(this.sprites.bin, binSpriteLayout.x, binSpriteLayout.y, visualWidth, visualHeight, 0, 1);
     } else {
       this.graphics.fillStyle(0x6a4f38, 0.22);
-      this.graphics.fillRoundedRect(binX - visualWidth * 0.52, binY - visualHeight * 0.18, visualWidth * 1.04, visualHeight, 12);
+      this.graphics.fillRoundedRect(binSpriteLayout.x - visualWidth * 0.52, binSpriteLayout.y - visualHeight * 0.78, visualWidth * 1.04, visualHeight, 12);
       this.graphics.lineStyle(4, 0x4b4b4b, 1);
-      this.graphics.strokeRoundedRect(binX - visualWidth * 0.5, binY - visualHeight * 0.44, visualWidth, visualHeight * 0.66, 10);
+      this.graphics.strokeRoundedRect(binSpriteLayout.x - visualWidth * 0.5, binSpriteLayout.y - visualHeight, visualWidth, visualHeight * 0.66, 10);
     }
 
     this.graphics.lineStyle(3, 0xb76b34, 0.34);
-    this.graphics.strokeRoundedRect(binX - collisionWidth * 0.5, binY - visualHeight * 0.32, collisionWidth, visualHeight * 0.38, 14);
+    this.graphics.strokeRoundedRect(entryWindowRect.x, entryWindowRect.y, entryWindowRect.width, entryWindowRect.height, 14);
   }
 
   private drawObstacles(worldTimeMs: number): void {
     this.graphics.fillStyle(0x675c50, 0.88);
 
-    for (const obstacle of this.stage.obstacles) {
+    for (const [index, obstacle] of this.stage.obstacles.entries()) {
       const pose = getObstacleWorldPose({
         basePosition: obstacle.position,
         motion: obstacle.motion,
@@ -277,15 +497,31 @@ export class StageRenderer {
         continue;
       }
 
+      const obstacleSpriteLayout = createObstacleSpriteLayout({
+        obstacleId: obstacle.id,
+        screenX: screen.x,
+        screenY: screen.y,
+        projectedScale: screen.scale,
+        obstacleSize: obstacle.size,
+      });
+      const obstacleSprite = this.sprites.obstacles[index]?.sprite;
+      if (obstacleSpriteLayout && obstacleSprite) {
+        obstacleSprite.setOrigin(obstacleSpriteLayout.originX, obstacleSpriteLayout.originY);
+        this.syncSprite(
+          obstacleSprite,
+          obstacleSpriteLayout.x,
+          obstacleSpriteLayout.y,
+          obstacleSpriteLayout.width,
+          obstacleSpriteLayout.height,
+          0,
+          1,
+        );
+        continue;
+      }
+
       const obstacleWidth = Math.max(34, obstacle.size.x * 160 * screen.scale);
       const obstacleHeight = Math.max(22, obstacle.size.y * 132 * screen.scale);
-      this.graphics.fillRoundedRect(
-        screen.x - obstacleWidth * 0.5,
-        screen.y - obstacleHeight * 0.45,
-        obstacleWidth,
-        obstacleHeight,
-        10,
-      );
+      this.graphics.fillRoundedRect(screen.x - obstacleWidth * 0.5, screen.y - obstacleHeight * 0.45, obstacleWidth, obstacleHeight, 10);
     }
   }
 
@@ -426,5 +662,23 @@ export class StageRenderer {
 
   private getLayout() {
     return createDeskLayout(this.getViewport());
+  }
+
+  private getBackdropPalette(): BackdropPalette {
+    if (this.stage.theme === 'office') {
+      return {
+        background: '#d8e0e8',
+        wall: 0xe6eaef,
+        trim: 0xd4dae3,
+        floor: 0x6c86a0,
+      };
+    }
+
+    return {
+      background: '#e8dccd',
+      wall: 0xf4ede1,
+      trim: 0xe4d2bb,
+      floor: 0xc9a578,
+    };
   }
 }

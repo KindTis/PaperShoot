@@ -70,6 +70,7 @@ describe('projectDeskPoint', () => {
     };
     const stage = {
       ...stage01,
+      theme: 'room' as const,
       fan: { ...stage01.fan, enabled: false },
       paper: { ...stage01.paper, spawn: { ...stage01.paper.spawn, z: -0.2 } },
     };
