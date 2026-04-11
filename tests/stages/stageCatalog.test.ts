@@ -20,4 +20,9 @@ describe('stageCatalog (stage 01-03)', () => {
   it('passes stage catalog validation for stage 01-03', () => {
     expect(() => validateStageCatalog(stageCatalog.slice(0, 3))).not.toThrow();
   });
+
+  it('uses office theme for stage 01-06', () => {
+    expect(stageCatalog).toHaveLength(6);
+    expect(stageCatalog.every((stage) => stage.theme === 'office')).toBe(true);
+  });
 });

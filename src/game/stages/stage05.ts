@@ -3,7 +3,7 @@ import { buildBaseStage } from './buildBaseStage';
 export const stage05 = buildBaseStage({
   id: 'stage-05',
   order: 5,
-  theme: 'classroom',
+  theme: 'office',
   clear: { throwLimit: 5, requiredSuccesses: 1 },
   fan: {
     enabled: true,
