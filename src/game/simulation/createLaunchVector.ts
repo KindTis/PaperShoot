@@ -8,8 +8,8 @@ interface CreateLaunchVectorInput {
   maxPower: number;
 }
 
-const MIN_LAUNCH_SPEED = 10.5;
-const MAX_LAUNCH_SPEED = 19;
+const MIN_LAUNCH_SPEED = 11;
+const MAX_LAUNCH_SPEED = 21;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));

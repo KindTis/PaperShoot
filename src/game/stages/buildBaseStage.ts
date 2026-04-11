@@ -14,7 +14,7 @@ export function buildBaseStage(input: BaseStageInput): StageConfig {
       yawMinDeg: -18,
       yawMaxDeg: 18,
       pitchMinDeg: 18,
-      pitchMaxDeg: 54,
+      pitchMaxDeg: 42,
       defaultYawDeg: 0,
       defaultPitchDeg: 30,
     },

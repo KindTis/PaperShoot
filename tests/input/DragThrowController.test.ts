@@ -47,4 +47,18 @@ describe('DragThrowController', () => {
     });
     expect(controller.getPreview().active).toBe(false);
   });
+
+  it('keeps a full upward drag at max power without turning into an extreme lob', () => {
+    const controller = new DragThrowController(stage01);
+
+    controller.beginDrag({ x: 0.5, y: 0.92 });
+    controller.updateDrag({ x: 0.5, y: 0.08 });
+
+    const preview = controller.getPreview();
+
+    expect(preview.active).toBe(true);
+    expect(preview.power01).toBe(1);
+    expect(preview.pitchDeg).toBeGreaterThan(stage01.aim.defaultPitchDeg);
+    expect(preview.pitchDeg).toBeLessThanOrEqual(42);
+  });
 });
