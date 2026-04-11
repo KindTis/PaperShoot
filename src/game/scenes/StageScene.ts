@@ -5,16 +5,21 @@ import { DragThrowController } from '../input/DragThrowController';
 import { StageRenderer } from '../render/StageRenderer';
 import { StageRuntime } from '../runtime/StageRuntime';
 import type { RuntimeSnapshot } from '../runtime/runtimeTypes';
+import { resolveStageSelection } from '../stages/resolveStageSelection';
 import { shouldBeginLaunchDrag, shouldResetForNewDrag } from './stageInputPolicy';
 import { stageCatalog } from '../stages/stageCatalog';
+import { publishStageDebugState } from './publishStageDebugState';
 
 const FIXED_DT_MS = 1000 / 60;
 
 export class StageScene extends Phaser.Scene {
-  private readonly stage = stageCatalog[0];
-  private readonly runtime = new StageRuntime(this.stage);
-  private readonly dragController = new DragThrowController(this.stage);
+  private stage!: (typeof stageCatalog)[number];
+  private runtime!: StageRuntime;
+  private dragController!: DragThrowController;
   private accumulatorMs = 0;
+  private shellBannerText = '';
+  private primaryActionText = '';
+  private primaryActionVisible = false;
 
   private stageRenderer!: StageRenderer;
   private hud!: HudPresenter;
@@ -25,12 +30,24 @@ export class StageScene extends Phaser.Scene {
   }
 
   create(): void {
+    const selection = resolveStageSelection(window.location.search, stageCatalog.length);
+    this.stage = stageCatalog[selection.order - 1];
+    this.runtime = new StageRuntime(this.stage);
+    this.dragController = new DragThrowController(this.stage);
+    publishStageDebugState(document, {
+      stageId: this.stage.id,
+      stageOrder: this.stage.order,
+      stageSource: selection.source,
+      obstacleIds: this.stage.obstacles.map((o) => o.id),
+    });
+
     this.stageRenderer = new StageRenderer(this, this.stage);
     this.hudRoot = createHudRoot(document);
     this.hud = new HudPresenter(this.hudRoot);
 
     this.bindDragInput();
     this.bindKeyboardInput();
+    this.bindHudActions();
     this.hideLegacyTouchButtons();
     this.renderFrame();
   }
@@ -114,21 +131,42 @@ export class StageScene extends Phaser.Scene {
     }
 
     keyboard.on('keydown-R', () => {
-      if (this.runtime.getSnapshot().stageStatus === 'playing') {
+      const snapshot = this.runtime.getSnapshot();
+      if (snapshot.stageStatus === 'failed') {
+        this.runtime.restartStage();
+        this.clearShellUi();
+        this.renderFrame();
+        return;
+      }
+
+      if (snapshot.stageStatus === 'playing') {
         this.runtime.retryThrow();
       }
     });
   }
 
+  private bindHudActions(): void {
+    const onRetry = () => {
+      this.runtime.restartStage();
+      this.clearShellUi();
+      this.renderFrame();
+    };
+
+    this.hudRoot.retryButton.addEventListener('click', onRetry);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.hudRoot.retryButton.removeEventListener('click', onRetry);
+    });
+  }
+
   private hideLegacyTouchButtons(): void {
-    const actions = this.hudRoot.confirmAimButton.parentElement as HTMLElement | null;
-    if (actions) {
-      actions.hidden = true;
-    }
+    this.hudRoot.confirmAimButton.hidden = true;
+    this.hudRoot.confirmPowerButton.hidden = true;
+    this.hudRoot.retryButton.hidden = true;
   }
 
   private renderFrame(): void {
     const snapshot = this.runtime.getSnapshot();
+    this.applyShellEvent(this.runtime.consumeShellEvent());
     const preview = this.dragController.getPreview();
     const renderSnapshot = preview.active
       ? {
@@ -157,12 +195,39 @@ export class StageScene extends Phaser.Scene {
       stageLabel: `Stage ${this.stage.order}`,
       throwText: `${snapshot.remainingThrows} throws left`,
       successText: `${snapshot.successCount}/${this.stage.clear.requiredSuccesses}`,
-      windText: this.stage.fan.enabled ? `${windArrow} ${this.stage.fan.strengthLabel} wind` : '무풍',
+      windText: this.stage.fan.enabled
+        ? `${windArrow} ${this.stage.fan.strengthLabel} ${Math.abs(this.stage.fan.targetLateralSpeed).toFixed(1)}`
+        : '· calm 0.0',
       aimText: '',
       powerText: '',
       failureReasonText: '',
-      resultBannerText: snapshot.resultOverlay.text || tutorialText,
+      resultBannerText: this.shellBannerText || snapshot.resultOverlay.text || tutorialText,
+      primaryActionText: this.primaryActionText,
+      primaryActionVisible: this.primaryActionVisible,
     };
+  }
+
+  private applyShellEvent(shellEvent: ReturnType<StageRuntime['consumeShellEvent']>): void {
+    if (!shellEvent) {
+      return;
+    }
+
+    if (shellEvent.type === 'stage_failed') {
+      this.shellBannerText = 'Game Over';
+      this.primaryActionText = 'Retry';
+      this.primaryActionVisible = true;
+      return;
+    }
+
+    this.shellBannerText = 'Stage Clear';
+    this.primaryActionText = '';
+    this.primaryActionVisible = false;
+  }
+
+  private clearShellUi(): void {
+    this.shellBannerText = '';
+    this.primaryActionText = '';
+    this.primaryActionVisible = false;
   }
 
   private normalizeDomPointer(canvas: HTMLCanvasElement, event: PointerEvent): { x: number; y: number } {
