@@ -31,7 +31,7 @@ export class StageScene extends Phaser.Scene {
 
   create(): void {
     const selection = resolveStageSelection(window.location.search, stageCatalog.length);
-    this.stage = stageCatalog[selection.order - 1];
+    this.stage = stageCatalog.find((stage) => stage.order === selection.order) ?? stageCatalog[0];
     this.runtime = new StageRuntime(this.stage);
     this.dragController = new DragThrowController(this.stage);
     publishStageDebugState(document, {
