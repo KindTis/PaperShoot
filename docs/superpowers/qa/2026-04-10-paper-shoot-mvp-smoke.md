@@ -61,7 +61,7 @@
 
 - Date: 2026-04-11
 - Command: `npm exec playwright test tests/e2e/stage-direct-entry.spec.ts`
-- Result: `7 passed (1.0m)`
+- Result: `7 passed (1.1m)`
 - Base URL: `http://127.0.0.1:4174/PaperShoot/`
 - Stage URL pattern: `http://127.0.0.1:4174/PaperShoot/?stage={N}`
 
@@ -82,3 +82,10 @@
   - 3회 투척 소진 -> `Game Over` 배너 및 `Retry` 버튼 표시 확인
   - `Retry` 클릭 후 `3 throws left`로 리셋 확인
   - Evidence: `output/playwright/stage-01-game-over-retry.png`
+
+### Final Verification Notes
+
+- Stage 1 confirms the shared office backplate without obstacle overlays.
+- Stage 6 confirms `moving-panel` and `gate-final` composition inside the same office lane.
+- `Game Over -> Retry` still passes after the raster art and direct-entry integration.
+- Wind HUD remains visible without blocking the central throw lane at `1280x720`.
