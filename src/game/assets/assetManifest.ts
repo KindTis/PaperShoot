@@ -19,18 +19,6 @@ export const assetManifest = {
       key: 'office-backplate-main',
       path: 'assets/papershoot/background/office-backplate-main.webp',
     },
-    midgroundDeskCluster: {
-      key: 'office-midground-desk-cluster',
-      path: 'assets/papershoot/background/office-midground-desk-cluster.png',
-    },
-    sideCubicleLeft: {
-      key: 'office-side-cubicle-left',
-      path: 'assets/papershoot/background/office-side-cubicle-left.png',
-    },
-    sideCubicleRight: {
-      key: 'office-side-cubicle-right',
-      path: 'assets/papershoot/background/office-side-cubicle-right.png',
-    },
     foregroundDeskEdge: {
       key: 'office-foreground-desk-edge',
       path: 'assets/papershoot/background/office-foreground-desk-edge.png',
@@ -104,9 +92,6 @@ export const assetManifest = {
 
 export const stageArtAssets = [
   assetManifest.background.backplate,
-  assetManifest.background.midgroundDeskCluster,
-  assetManifest.background.sideCubicleLeft,
-  assetManifest.background.sideCubicleRight,
   assetManifest.background.foregroundDeskEdge,
   assetManifest.paper.idle,
   assetManifest.bin.main,

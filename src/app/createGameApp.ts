@@ -6,6 +6,7 @@ type PhaserModuleLike = {
   AUTO: number | string;
   Scale: {
     RESIZE: number | string;
+    FIT: number | string;
     CENTER_BOTH: number | string;
   };
   Game: new (config: Record<string, unknown>) => DestroyableGame;
@@ -80,14 +81,14 @@ function buildGameConfig(
     type: phaserModule.AUTO,
     parent: getAppConfig().parentId,
     backgroundColor: '#ede4d6',
-    width: 1280,
-    height: 720,
+    width: 540,
+    height: 960,
     scene: [scenes.BootScene, scenes.StageScene],
     scale: {
-      mode: phaserModule.Scale.RESIZE,
+      mode: phaserModule.Scale.FIT,
       autoCenter: phaserModule.Scale.CENTER_BOTH,
-      width: 1280,
-      height: 720,
+      width: 540,
+      height: 960,
     },
     render: {
       antialias: true,

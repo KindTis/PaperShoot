@@ -29,9 +29,6 @@ type RenderSprites = {
   pencilCup: Phaser.GameObjects.Image | null;
   officeBackdrop: {
     backplate: Phaser.GameObjects.Image | null;
-    midgroundDeskCluster: Phaser.GameObjects.Image | null;
-    sideCubicleLeft: Phaser.GameObjects.Image | null;
-    sideCubicleRight: Phaser.GameObjects.Image | null;
     foregroundDeskEdge: Phaser.GameObjects.Image | null;
   };
   obstacles: Array<{
@@ -52,36 +49,6 @@ const OFFICE_BACKDROP_LAYOUT = [
     yRatio: 0.5,
     widthRatio: 1.04,
     heightRatio: 1.02,
-    originX: 0.5,
-    originY: 0.5,
-    alpha: 1,
-  },
-  {
-    key: 'midgroundDeskCluster',
-    xRatio: 0.5,
-    yRatio: 0.54,
-    widthRatio: 0.94,
-    heightRatio: 0.44,
-    originX: 0.5,
-    originY: 0.5,
-    alpha: 0.98,
-  },
-  {
-    key: 'sideCubicleLeft',
-    xRatio: 0.12,
-    yRatio: 0.44,
-    widthRatio: 0.26,
-    heightRatio: 0.62,
-    originX: 0.5,
-    originY: 0.5,
-    alpha: 1,
-  },
-  {
-    key: 'sideCubicleRight',
-    xRatio: 0.88,
-    yRatio: 0.45,
-    widthRatio: 0.26,
-    heightRatio: 0.62,
     originX: 0.5,
     originY: 0.5,
     alpha: 1,
@@ -186,9 +153,6 @@ export class StageRenderer {
       pencilCup: create(assetManifest.props.pencilCup.key, 4),
       officeBackdrop: {
         backplate: this.stage.theme === 'office' ? create(assetManifest.background.backplate.key, 0) : null,
-        midgroundDeskCluster: this.stage.theme === 'office' ? create(assetManifest.background.midgroundDeskCluster.key, 1) : null,
-        sideCubicleLeft: this.stage.theme === 'office' ? create(assetManifest.background.sideCubicleLeft.key, 2) : null,
-        sideCubicleRight: this.stage.theme === 'office' ? create(assetManifest.background.sideCubicleRight.key, 2) : null,
         foregroundDeskEdge: this.stage.theme === 'office' ? create(assetManifest.background.foregroundDeskEdge.key, 3) : null,
       },
       obstacles: this.stage.obstacles.map((obstacle) => {
@@ -209,9 +173,6 @@ export class StageRenderer {
       this.sprites.cup,
       this.sprites.pencilCup,
       this.sprites.officeBackdrop.backplate,
-      this.sprites.officeBackdrop.midgroundDeskCluster,
-      this.sprites.officeBackdrop.sideCubicleLeft,
-      this.sprites.officeBackdrop.sideCubicleRight,
       this.sprites.officeBackdrop.foregroundDeskEdge,
     ];
     for (const sprite of commonSprites) {
@@ -278,15 +239,12 @@ export class StageRenderer {
 
   private drawOfficeBackdropSprites(): boolean {
     const layers = this.sprites.officeBackdrop;
-    if (!layers.backplate || !layers.midgroundDeskCluster || !layers.sideCubicleLeft || !layers.sideCubicleRight || !layers.foregroundDeskEdge) {
+    if (!layers.backplate || !layers.foregroundDeskEdge) {
       return false;
     }
 
     const layerSprites = {
       backplate: layers.backplate,
-      midgroundDeskCluster: layers.midgroundDeskCluster,
-      sideCubicleLeft: layers.sideCubicleLeft,
-      sideCubicleRight: layers.sideCubicleRight,
       foregroundDeskEdge: layers.foregroundDeskEdge,
     } as const;
     const width = this.scene.scale.width;
@@ -364,6 +322,7 @@ export class StageRenderer {
   }
 
   private drawOfficeProps(): void {
+    return; // hotfix: disable drawing dummy props
     const width = this.scene.scale.width;
     const height = this.scene.scale.height;
 
@@ -434,7 +393,7 @@ export class StageRenderer {
     }
 
     if (this.sprites.fan) {
-      const size = Math.max(64, 140 * originProjected.scale * 3.2);
+      const size = Math.max(120, 140 * originProjected.scale * 8.0);
       this.syncSprite(this.sprites.fan, fanX, fanY, size, size, -6, 0.96);
       return;
     }
@@ -466,12 +425,12 @@ export class StageRenderer {
       minHeight: 20,
     });
 
-    this.graphics.fillStyle(0x3b2b1f, 0.14);
-    this.graphics.fillRoundedRect(binSpriteLayout.x - visualWidth * 0.38, binSpriteLayout.y + visualHeight * 0.06, visualWidth * 0.76, 14, 7);
+    // this.graphics.fillStyle(0x3b2b1f, 0.14);
+    // this.graphics.fillRoundedRect(binSpriteLayout.x - visualWidth * 0.38, binSpriteLayout.y + visualHeight * 0.06, visualWidth * 0.76, 14, 7);
 
     if (this.sprites.bin) {
       this.sprites.bin.setOrigin(binSpriteLayout.originX, binSpriteLayout.originY);
-      this.syncSprite(this.sprites.bin, binSpriteLayout.x, binSpriteLayout.y, visualWidth, visualHeight, 0, 1);
+      this.syncSprite(this.sprites.bin, binSpriteLayout.x, binSpriteLayout.y, visualWidth * 5.0, visualHeight * 5.0, 0, 1);
     } else {
       this.graphics.fillStyle(0x6a4f38, 0.22);
       this.graphics.fillRoundedRect(binSpriteLayout.x - visualWidth * 0.52, binSpriteLayout.y - visualHeight * 0.78, visualWidth * 1.04, visualHeight, 12);
@@ -479,11 +438,12 @@ export class StageRenderer {
       this.graphics.strokeRoundedRect(binSpriteLayout.x - visualWidth * 0.5, binSpriteLayout.y - visualHeight, visualWidth, visualHeight * 0.66, 10);
     }
 
-    this.graphics.lineStyle(3, 0xb76b34, 0.34);
-    this.graphics.strokeRoundedRect(entryWindowRect.x, entryWindowRect.y, entryWindowRect.width, entryWindowRect.height, 14);
+    // this.graphics.lineStyle(3, 0xb76b34, 0.34);
+    // this.graphics.strokeRoundedRect(entryWindowRect.x, entryWindowRect.y, entryWindowRect.width, entryWindowRect.height, 14);
   }
 
   private drawObstacles(worldTimeMs: number): void {
+    return; // Hotfix: hide default SVG obstacles which look like floating shapes
     this.graphics.fillStyle(0x675c50, 0.88);
 
     for (const [index, obstacle] of this.stage.obstacles.entries()) {
@@ -506,13 +466,13 @@ export class StageRenderer {
       });
       const obstacleSprite = this.sprites.obstacles[index]?.sprite;
       if (obstacleSpriteLayout && obstacleSprite) {
-        obstacleSprite.setOrigin(obstacleSpriteLayout.originX, obstacleSpriteLayout.originY);
+        obstacleSprite!.setOrigin(obstacleSpriteLayout!.originX, obstacleSpriteLayout!.originY);
         this.syncSprite(
-          obstacleSprite,
-          obstacleSpriteLayout.x,
-          obstacleSpriteLayout.y,
-          obstacleSpriteLayout.width,
-          obstacleSpriteLayout.height,
+          obstacleSprite!,
+          obstacleSpriteLayout!.x,
+          obstacleSpriteLayout!.y,
+          obstacleSpriteLayout!.width,
+          obstacleSpriteLayout!.height,
           0,
           1,
         );
@@ -589,7 +549,7 @@ export class StageRenderer {
     }
 
     const heightAboveDesk = Math.max(0, position.y - this.stage.paper.radius);
-    const width = Math.max(16, this.stage.paper.radius * 180 * groundProjected.scale * 1.5);
+    const width = Math.max(16, this.stage.paper.radius * 180 * groundProjected.scale * 5.0);
     const alpha = snapshot.activeBody
       ? Phaser.Math.Clamp(0.24 - heightAboveDesk * 0.1, 0.08, 0.22)
       : 0.12;
@@ -606,7 +566,7 @@ export class StageRenderer {
       return;
     }
 
-    const diameter = Math.max(22, this.stage.paper.radius * 220 * projected.scale * 1.08);
+    const diameter = Math.max(22, this.stage.paper.radius * 220 * projected.scale * 5.0);
     const angle = activeBody ? Phaser.Math.Clamp(activeBody.velocity.x * -3.5, -22, 22) : -8;
     const alpha = activeBody ? 1 : 0.96;
 

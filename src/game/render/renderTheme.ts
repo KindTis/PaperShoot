@@ -20,6 +20,6 @@ export const deskCameraRigTheme = {
 
 export const deskLayoutTheme = {
   paperAnchor: { xRatio: 0.5, yRatio: 0.84 },
-  binAnchor: { xRatio: 0.56, yRatio: 0.52 },
-  fanAnchor: { xRatio: 0.18, yRatio: 0.78 },
+  binAnchor: { xRatio: 0.5, yRatio: 0.48 },
+  fanAnchor: { xRatio: 0.82, yRatio: 0.85 },
 } as const;
