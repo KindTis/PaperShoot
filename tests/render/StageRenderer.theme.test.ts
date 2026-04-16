@@ -137,9 +137,6 @@ describe('StageRenderer theme routing', () => {
     expect(createdKeys).toEqual(
       expect.arrayContaining([
         assetManifest.background.backplate.key,
-        assetManifest.background.midgroundDeskCluster.key,
-        assetManifest.background.sideCubicleLeft.key,
-        assetManifest.background.sideCubicleRight.key,
         assetManifest.background.foregroundDeskEdge.key,
       ]),
     );
@@ -148,50 +145,5 @@ describe('StageRenderer theme routing', () => {
     );
   });
 
-  it('uses geometry-contracted bin entry window Y in graphics fallback path', async () => {
-    vi.resetModules();
-    vi.doMock('phaser', () => ({
-      default: {
-        Math: {
-          Clamp: (value: number, min: number, max: number) => Math.min(max, Math.max(min, value)),
-          Linear: (start: number, end: number, t: number) => start + (end - start) * t,
-        },
-      },
-    }));
 
-    const { StageRenderer } = await import('../../src/game/render/StageRenderer');
-    const graphics = createGraphicsStub();
-    const scene = {
-      add: {
-        graphics: () => graphics,
-      },
-      scale: { width: 1280, height: 720 },
-      cameras: { main: { setBackgroundColor: vi.fn() } },
-    };
-
-    const renderer = new StageRenderer(scene as never, stage03);
-    renderer.render(createSnapshot());
-
-    const viewport = { width: 1280, height: 720 };
-    const deskLayout = createDeskLayout(viewport);
-    const projectedBin = projectDeskPoint(stage03.bin.position, viewport);
-    const binLayout = createBinSpriteLayout({
-      screenX: deskLayout.binAnchor.x,
-      screenY: deskLayout.binAnchor.y,
-      projectedScale: projectedBin.scale,
-      openingWidth: stage03.bin.openingWidth,
-    });
-    const expectedEntryRect = createBinEntryWindowRect({
-      binLayout,
-      minWidth: 86,
-      minHeight: 20,
-    });
-    const entryWindowStrokeCalls = graphics.strokeRoundedRect.mock.calls.filter((call) => call[4] === 14);
-
-    expect(entryWindowStrokeCalls).toHaveLength(1);
-    expect(entryWindowStrokeCalls[0][0]).toBeCloseTo(expectedEntryRect.x, 6);
-    expect(entryWindowStrokeCalls[0][1]).toBeCloseTo(expectedEntryRect.y, 6);
-    expect(entryWindowStrokeCalls[0][2]).toBeCloseTo(expectedEntryRect.width, 6);
-    expect(entryWindowStrokeCalls[0][3]).toBeCloseTo(expectedEntryRect.height, 6);
-  });
 });

@@ -16,15 +16,7 @@ function getManifestRasterPaths(): string[] {
 describe('assetManifest', () => {
   it('uses raster stage art paths grouped by category', () => {
     expect(assetManifest.background.backplate.path).toBe('assets/papershoot/background/office-backplate-main.webp');
-    expect(assetManifest.background.midgroundDeskCluster.path).toBe(
-      'assets/papershoot/background/office-midground-desk-cluster.png',
-    );
-    expect(assetManifest.background.sideCubicleLeft.path).toBe(
-      'assets/papershoot/background/office-side-cubicle-left.png',
-    );
-    expect(assetManifest.background.sideCubicleRight.path).toBe(
-      'assets/papershoot/background/office-side-cubicle-right.png',
-    );
+
     expect(assetManifest.background.foregroundDeskEdge.path).toBe(
       'assets/papershoot/background/office-foreground-desk-edge.png',
     );

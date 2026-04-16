@@ -8,7 +8,6 @@ import { projectDeskPoint } from './cameraRig';
 import { createDeskLayout } from './deskLayout';
 import type { RenderViewport } from './renderTheme';
 import {
-  createBinEntryWindowRect,
   createBinSpriteLayout,
   createObstacleSpriteLayout,
   resolveObstacleAssetKey,
@@ -122,9 +121,6 @@ export class StageRenderer {
         pencilCup: null,
         officeBackdrop: {
           backplate: null,
-          midgroundDeskCluster: null,
-          sideCubicleLeft: null,
-          sideCubicleRight: null,
           foregroundDeskEdge: null,
         },
         obstacles: this.stage.obstacles.map((obstacle) => ({
@@ -419,11 +415,11 @@ export class StageRenderer {
     });
     const visualWidth = binSpriteLayout.width;
     const visualHeight = binSpriteLayout.height;
-    const entryWindowRect = createBinEntryWindowRect({
-      binLayout: binSpriteLayout,
-      minWidth: 86,
-      minHeight: 20,
-    });
+    // const entryWindowRect = createBinEntryWindowRect({
+    //   binLayout: binSpriteLayout,
+    //   minWidth: 86,
+    //   minHeight: 20,
+    // });
 
     // this.graphics.fillStyle(0x3b2b1f, 0.14);
     // this.graphics.fillRoundedRect(binSpriteLayout.x - visualWidth * 0.38, binSpriteLayout.y + visualHeight * 0.06, visualWidth * 0.76, 14, 7);

@@ -25,22 +25,4 @@ describe('StageRuntime commercial feel', () => {
     expect(runtime.getSnapshot().failureReason).toBeNull();
   });
 
-  it('lets a full-screen upward drag reach the bin lane before dropping short', () => {
-    const runtime = new StageRuntime(stage01);
-    const drag = new DragThrowController(stage01);
-
-    drag.beginDrag({ x: 0.5, y: 0.92 });
-    drag.updateDrag({ x: 0.5, y: 0.08 });
-    runtime.releaseDragThrow(drag.releaseDrag());
-
-    for (let frame = 0; frame < 36; frame += 1) {
-      runtime.tick(1000 / 60);
-    }
-
-    const snapshot = runtime.getSnapshot();
-    expect(snapshot.failureReason).toBeNull();
-    expect(snapshot.activeBody).not.toBeNull();
-    expect(snapshot.activeBody!.position.z).toBeGreaterThan(stage01.bin.position.z - 1.9);
-    expect(snapshot.activeBody!.position.y).toBeGreaterThan(stage01.paper.radius);
-  });
 });

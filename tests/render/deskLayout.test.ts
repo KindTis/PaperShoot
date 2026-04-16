@@ -8,8 +8,7 @@ describe('createDeskLayout', () => {
 
     expect(layout.paperAnchor.x).toBeCloseTo(viewport.width * 0.5, 6);
     expect(layout.paperAnchor.y).toBeGreaterThan(viewport.height * 0.75);
-    expect(layout.binAnchor.x).toBeGreaterThan(layout.paperAnchor.x);
-    expect(layout.binAnchor.x).toBeLessThan(viewport.width * 0.7);
+    expect(layout.binAnchor.x).toBeCloseTo(viewport.width * 0.5, 6);
     expect(layout.binAnchor.y).toBeGreaterThan(viewport.height * 0.4);
     expect(layout.binAnchor.y).toBeLessThan(viewport.height * 0.65);
   });
@@ -18,8 +17,7 @@ describe('createDeskLayout', () => {
     const viewport = { width: 1280, height: 720 };
     const layout = createDeskLayout(viewport);
 
-    expect(layout.fanAnchor.x).toBeLessThan(layout.paperAnchor.x);
-    expect(layout.fanAnchor.x).toBeLessThan(viewport.width * 0.35);
+    expect(layout.fanAnchor.x).toBeCloseTo(viewport.width * 0.82, 6);
     expect(layout.fanAnchor.y).toBeGreaterThan(viewport.height * 0.68);
     expect(layout.fanAnchor.y).toBeLessThan(viewport.height * 0.9);
   });

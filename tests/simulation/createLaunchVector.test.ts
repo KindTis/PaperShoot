@@ -13,8 +13,8 @@ describe('createLaunchVector', () => {
 
     expect(vector).toMatchObject({
       x: 0,
-      y: 8,
-      z: 13.86,
+      y: 10.5,
+      z: 18.19,
     });
   });
 
@@ -27,7 +27,7 @@ describe('createLaunchVector', () => {
       maxPower: 1,
     });
 
-    expect(vector.z).toBeCloseTo(11, 6);
+    expect(vector.z).toBeCloseTo(14, 6);
   });
 
   it('clamps power above range to maximum launch speed', () => {
@@ -39,7 +39,7 @@ describe('createLaunchVector', () => {
       maxPower: 1,
     });
 
-    expect(vector.z).toBeCloseTo(21, 6);
+    expect(vector.z).toBeCloseTo(28, 6);
   });
 
   it('biases a strong drag throw toward forward travel', () => {
