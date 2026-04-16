@@ -30,6 +30,12 @@ export type GameApp = {
   game: DestroyableGame;
 };
 
+type ViewportProfile = {
+  width: number;
+  height: number;
+  scaleMode: 'FIT' | 'RESIZE';
+};
+
 let activeGame: DestroyableGame | null = null;
 
 export function getAppConfig() {
@@ -74,6 +80,7 @@ function getDefaultDependencies(): CreateGameAppDependencies {
 }
 
 function buildGameConfig(
+  viewportProfile: ViewportProfile,
   phaserModule: PhaserModuleLike,
   scenes: SceneModuleLike,
 ): Record<string, unknown> {
@@ -81,14 +88,14 @@ function buildGameConfig(
     type: phaserModule.AUTO,
     parent: getAppConfig().parentId,
     backgroundColor: '#ede4d6',
-    width: 540,
-    height: 960,
+    width: viewportProfile.width,
+    height: viewportProfile.height,
     scene: [scenes.BootScene, scenes.StageScene],
     scale: {
-      mode: phaserModule.Scale.FIT,
+      mode: phaserModule.Scale[viewportProfile.scaleMode],
       autoCenter: phaserModule.Scale.CENTER_BOTH,
-      width: 540,
-      height: 960,
+      width: viewportProfile.width,
+      height: viewportProfile.height,
     },
     render: {
       antialias: true,
@@ -100,6 +107,27 @@ function buildGameConfig(
       touch: true,
       keyboard: true,
     },
+  };
+}
+
+function resolveViewportProfile(doc: Document): ViewportProfile {
+  const viewportWidth = doc.defaultView?.innerWidth ?? 1280;
+  const viewportHeight = doc.defaultView?.innerHeight ?? 720;
+  const isSmallScreen = viewportWidth < 768;
+  const isLandscape = viewportWidth >= viewportHeight;
+
+  if (!isSmallScreen && isLandscape) {
+    return {
+      width: 1280,
+      height: 720,
+      scaleMode: 'RESIZE',
+    };
+  }
+
+  return {
+    width: 540,
+    height: 960,
+    scaleMode: 'FIT',
   };
 }
 
@@ -120,7 +148,8 @@ export async function createGameApp(
   }
 
   const [phaserModule, scenes] = await Promise.all([loadPhaser(), loadScenes()]);
-  const game = new phaserModule.Game(buildGameConfig(phaserModule, scenes));
+  const viewportProfile = resolveViewportProfile(doc);
+  const game = new phaserModule.Game(buildGameConfig(viewportProfile, phaserModule, scenes));
   activeGame = game;
 
   return {
