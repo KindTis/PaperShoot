@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import { assetManifest } from '../../src/game/assets/assetManifest';
-import { projectDeskPoint } from '../../src/game/render/cameraRig';
-import { createDeskLayout } from '../../src/game/render/deskLayout';
-import { createBinEntryWindowRect, createBinSpriteLayout } from '../../src/game/render/stageSpriteLayout';
 import { stage03 } from '../../src/game/stages/stage03';
 import { stage06 } from '../../src/game/stages/stage06';
 import type { RuntimeSnapshot } from '../../src/game/runtime/runtimeTypes';

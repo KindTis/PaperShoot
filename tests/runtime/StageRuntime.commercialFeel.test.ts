@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { DragThrowController } from '../../src/game/input/DragThrowController';
 import { StageRuntime } from '../../src/game/runtime/StageRuntime';
 import { stage01 } from '../../src/game/stages/stage01';
 
